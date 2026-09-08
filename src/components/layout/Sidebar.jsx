@@ -56,7 +56,7 @@ export default function Sidebar() {
         { label: "Tasks", href: "/tasks", icon: CheckSquare },
         { label: "Calendar", href: "/calendar", icon: Calendar },
         { label: "Profile", href: "/profile", icon: User },
-        { label: "Notification", href: "/notifications", icon: Bell }
+        // { label: "Notification", href: "/notifications", icon: Bell }
     ];
 
     const handleLogout = async () => {
