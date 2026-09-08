@@ -4,7 +4,17 @@ import ReminderModal from "@/components/notification/ReminderModal";
 
 export const metadata = {
   title: "MyTask - Manajemen Tugas Kuliah",
-  description: "Aplikasi manajemen tugas kuliah pribadi dengan sistem notifikasi internal",
+  description: "Aplikasi manajemen tugas kuliah pribadi dengan notifikasi Telegram",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MyTask",
+  },
+};
+
+export const viewport = {
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({ children }) {
