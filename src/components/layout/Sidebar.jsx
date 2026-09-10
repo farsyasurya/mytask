@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard,
     CheckSquare,
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import { subscribeNotifications } from "@/services/notificationService";
 
-export default function Sidebar() {
+export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: externalToggleDarkMode }) {
     const pathname = usePathname();
     const router = useRouter();
     const { logout, userData, user } = useAuth();
@@ -26,37 +27,33 @@ export default function Sidebar() {
     // State Buka/Tutup Sidebar (Desktop)
     const [isCollapsed, setIsCollapsed] = useState(false);
 
-    // State Dark Mode
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    // Fallback state jika prop tidak diberikan
+    const [localDarkMode, setLocalDarkMode] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Cek tema sistem / localStorage saat pertama dimuat
+    const isDarkMode = externalDarkMode !== undefined ? externalDarkMode : localDarkMode;
+    const toggleDarkMode = externalToggleDarkMode || (() => {
+        setLocalDarkMode(!localDarkMode);
+        document.documentElement.classList.toggle("dark");
+    });
+
     useEffect(() => {
-        if (document.documentElement.classList.contains("dark")) {
-            setIsDarkMode(true);
-        }
-        // Subscribe to notifications for badge count using available UID
         const uid = user?.uid || userData?.id_user;
         if (uid) {
             const unsubscribe = subscribeNotifications(uid, (notifs) => {
-                const unread = notifs.filter(n => !n.read).length;
+                const unread = (notifs || []).filter(n => !n.read).length;
                 setUnreadCount(unread);
             });
             return () => unsubscribe();
         }
-    }, [userData]);
-
-    const toggleDarkMode = () => {
-        setIsDarkMode(!isDarkMode);
-        document.documentElement.classList.toggle("dark");
-    };
+    }, [user, userData]);
 
     const navItems = [
         { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { label: "Tasks", href: "/tasks", icon: CheckSquare },
         { label: "Calendar", href: "/calendar", icon: Calendar },
         { label: "Profile", href: "/profile", icon: User },
-        // { label: "Notification", href: "/notifications", icon: Bell }
+        { label: "Notification", href: "/notifications", icon: Bell }
     ];
 
     const handleLogout = async () => {
@@ -82,7 +79,7 @@ export default function Sidebar() {
 
                 {/* Logo Section */}
                 <div className={`flex items-center gap-3 mb-6 px-2 overflow-hidden ${isCollapsed ? "justify-center" : ""}`}>
-                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
                         M
                     </div>
                     {!isCollapsed && (
@@ -119,15 +116,20 @@ export default function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 title={isCollapsed ? item.label : ""}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isCollapsed ? "justify-center" : ""}
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isCollapsed ? "justify-center" : ""
                                     } ${isActive
                                         ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold"
                                         : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                                     }`}
                             >
-                                <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-indigo-600 dark:text-indigo-400" : ""}`} />
+                                <div className="relative shrink-0">
+                                    <Icon className={`w-5 h-5 ${isActive ? "text-indigo-600 dark:text-indigo-400" : ""}`} />
+                                    {isCollapsed && item.label === "Notification" && unreadCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-white dark:border-slate-900" />
+                                    )}
+                                </div>
                                 {!isCollapsed && (
-                                    <span className="whitespace-nowrap transition-opacity duration-300">
+                                    <span className="whitespace-nowrap transition-opacity duration-300 flex-1 flex items-center justify-between">
                                         {item.label}
                                         {item.label === "Notification" && unreadCount > 0 && (
                                             <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-red-600 text-xs font-medium text-white">
@@ -143,16 +145,40 @@ export default function Sidebar() {
 
                 {/* Bottom Actions: Theme Toggle & Logout */}
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-                    {/* Toggle Mode Siang / Malam */}
+                    {/* Toggle Mode Siang / Malam with Animation */}
                     <button
                         onClick={toggleDarkMode}
                         title={isCollapsed ? (isDarkMode ? "Mode Siang" : "Mode Malam") : ""}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full ${isCollapsed ? "justify-center" : ""
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all w-full active:scale-95 ${isCollapsed ? "justify-center" : ""
                             }`}
                     >
-                        {isDarkMode ? <Sun className="w-5 h-5 text-amber-500 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
+                        <AnimatePresence mode="wait">
+                            {isDarkMode ? (
+                                <motion.div
+                                    key="sun-sidebar"
+                                    initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+                                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                                    exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+                                    transition={{ duration: 0.25 }}
+                                    className="shrink-0"
+                                >
+                                    <Sun className="w-5 h-5 text-amber-500" />
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="moon-sidebar"
+                                    initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+                                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                                    exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+                                    transition={{ duration: 0.25 }}
+                                    className="shrink-0"
+                                >
+                                    <Moon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         {!isCollapsed && (
-                            <span className="whitespace-nowrap">
+                            <span className="whitespace-nowrap flex-1 text-left">
                                 {isDarkMode ? "Mode Siang" : "Mode Malam"}
                             </span>
                         )}
@@ -181,8 +207,8 @@ export default function Sidebar() {
                             key={item.href}
                             href={item.href}
                             className={`flex flex-col items-center gap-1 text-[10px] font-medium py-1 px-3 rounded-lg transition-colors ${isActive
-                                ? "text-indigo-600 dark:text-indigo-400 font-bold"
-                                : "text-slate-500 dark:text-slate-400"
+                                    ? "text-indigo-600 dark:text-indigo-400 font-bold"
+                                    : "text-slate-500 dark:text-slate-400"
                                 }`}
                         >
                             <div className="relative">
@@ -195,14 +221,6 @@ export default function Sidebar() {
                         </Link>
                     );
                 })}
-                {/* Mobile Dark Mode Toggle Button */}
-                <button
-                    onClick={toggleDarkMode}
-                    className="flex flex-col items-center gap-1 text-[10px] font-medium py-1 px-3 text-slate-500 dark:text-slate-400"
-                >
-                    {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
-                    Tema
-                </button>
             </div>
         </>
     );
