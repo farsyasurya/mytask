@@ -19,17 +19,17 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-
-                // 🚀 Buka loading aplikasi SEGERA!
-                setLoading(false);
-
-                // 🚀 Ambil data profil secara asinkron di background
-                getUserProfile(currentUser.uid)
-                    .then((profile) => setUserData(profile))
-                    .catch((err) => console.error("Gagal load profile:", err));
+                try {
+                    const profile = await getUserProfile(currentUser.uid);
+                    setUserData(profile);
+                } catch (err) {
+                    console.error("Gagal memuat profil pengguna:", err);
+                } finally {
+                    setLoading(false);
+                }
             } else {
                 setUser(null);
                 setUserData(null);
@@ -47,6 +47,8 @@ export const AuthProvider = ({ children }) => {
     const register = async (name, email, password) => {
         const res = await createUserWithEmailAndPassword(auth, email, password);
         await createUserProfile(res.user.uid, name, email);
+        const profile = await getUserProfile(res.user.uid);
+        setUserData(profile);
         return res;
     };
 

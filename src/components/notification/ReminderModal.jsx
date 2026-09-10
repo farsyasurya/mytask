@@ -8,12 +8,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { getUserTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
 
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000; // 3 Jam dalam milidetik
+
 export default function ReminderModal() {
     const { user } = useAuth();
     const router = useRouter();
     const [reminders, setReminders] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [dismissed, setDismissed] = useState(false);
 
     useEffect(() => {
         if (!user?.uid) return;
@@ -24,9 +25,15 @@ export default function ReminderModal() {
                 const activeReminders = getUpcomingTaskReminders(tasks);
                 setReminders(activeReminders);
 
-                // Buka popup jika ada tugas yang membutuhkan pengingat dan modal belum ditutup
-                if (activeReminders.length > 0 && !dismissed) {
-                    setIsOpen(true);
+                if (activeReminders.length > 0) {
+                    const lastShown = localStorage.getItem("last_reminder_popup_timestamp");
+                    const now = Date.now();
+
+                    // Tampilkan popup HANYA jika belum pernah tampil ATAU sudah berlalu 3 jam sejak pop-up terakhir
+                    if (!lastShown || now - parseInt(lastShown, 10) >= THREE_HOURS_MS) {
+                        setIsOpen(true);
+                        localStorage.setItem("last_reminder_popup_timestamp", now.toString());
+                    }
                 }
             } catch (err) {
                 console.error("Gagal memeriksa pengingat tugas:", err);
@@ -34,10 +41,9 @@ export default function ReminderModal() {
         };
 
         checkReminders();
-    }, [user?.uid, dismissed]);
+    }, [user?.uid]);
 
     const handleClose = () => {
-        setDismissed(true);
         setIsOpen(false);
     };
 

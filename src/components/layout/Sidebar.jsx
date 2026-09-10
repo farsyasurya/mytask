@@ -55,17 +55,20 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
     }, [user?.uid]);
 
     const navItems = [
-        { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-        { label: "Tasks", href: "/tasks", icon: CheckSquare },
-        { label: "Calendar", href: "/calendar", icon: Calendar },
-        { label: "Profile", href: "/profile", icon: User },
-        { label: "Notification", href: "/notifications", icon: Bell }
+        { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+        { label: "Daftar Tugas", href: "/tasks", icon: CheckSquare },
+        { label: "Kalender", href: "/calendar", icon: Calendar },
+        { label: "Profil", href: "/profile", icon: User },
+        { label: "Notifikasi", href: "/notifications", icon: Bell }
     ];
 
     const handleLogout = async () => {
         await logout();
         router.push("/login");
     };
+
+    const displayName = userData?.name || user?.displayName || user?.email?.split("@")[0] || "Pengguna";
+    const userInitial = displayName.charAt(0).toUpperCase();
 
     return (
         <>
@@ -96,21 +99,19 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                 </div>
 
                 {/* User Info Box */}
-                {userData && (
-                    <div className={`bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl mb-6 border border-slate-100 dark:border-slate-800 transition-all ${isCollapsed ? "flex justify-center p-2" : ""
-                        }`}>
-                        {isCollapsed ? (
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 font-bold flex items-center justify-center text-xs">
-                                {userData.name ? userData.name.charAt(0).toUpperCase() : "U"}
-                            </div>
-                        ) : (
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{userData.name}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userData.id_user || userData.email}</p>
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div className={`bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl mb-6 border border-slate-100 dark:border-slate-800 transition-all ${isCollapsed ? "flex justify-center p-2" : ""
+                    }`}>
+                    {isCollapsed ? (
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 font-bold flex items-center justify-center text-xs">
+                            {userInitial}
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{displayName}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userData?.id_user || userData?.email || user?.email}</p>
+                        </div>
+                    )}
+                </div>
 
                 {/* Navigation Items */}
                 <nav className="flex-1 space-y-1.5">
@@ -130,14 +131,14 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                             >
                                 <div className="relative shrink-0">
                                     <Icon className={`w-5 h-5 ${isActive ? "text-indigo-600 dark:text-indigo-400" : ""}`} />
-                                    {isCollapsed && item.label === "Notification" && unreadCount > 0 && (
+                                    {isCollapsed && item.label === "Notifikasi" && unreadCount > 0 && (
                                         <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-white dark:border-slate-900" />
                                     )}
                                 </div>
                                 {!isCollapsed && (
                                     <span className="whitespace-nowrap transition-opacity duration-300 flex-1 flex items-center justify-between">
                                         {item.label}
-                                        {item.label === "Notification" && unreadCount > 0 && (
+                                        {item.label === "Notifikasi" && unreadCount > 0 && (
                                             <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-red-600 text-xs font-medium text-white">
                                                 {unreadCount}
                                             </span>
@@ -219,7 +220,7 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                         >
                             <div className="relative">
                                 <Icon className="w-5 h-5" />
-                                {item.label === "Notification" && unreadCount > 0 && (
+                                {item.label === "Notifikasi" && unreadCount > 0 && (
                                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-white dark:border-slate-900" />
                                 )}
                             </div>
