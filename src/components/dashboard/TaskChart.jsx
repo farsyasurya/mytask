@@ -13,11 +13,11 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-// Data konfigurasi warna & status agar tampilan lebih modern dan konsisten
+// Data konfigurasi warna & status
 const STATUS_CONFIG = {
-  Baru: { key: 'new', color: '#6366F1', label: 'Baru' }, // Indigo
-  'Dalam Proses': { key: 'on_progress', color: '#F59E0B', label: 'Dalam Proses' }, // Amber
-  Selesai: { key: 'done', color: '#10B981', label: 'Selesai' }, // Emerald
+  Baru: { key: 'new', color: '#8B5CF6' }, // Purple
+  'Dalam Proses': { key: 'on_progress', color: '#F59E0B' }, // Amber
+  Selesai: { key: 'done', color: '#10B981' }, // Emerald
 };
 
 const getStatusCounts = (tasks = []) => {
@@ -36,14 +36,14 @@ const getStatusCounts = (tasks = []) => {
   }));
 };
 
-// Custom Tooltip Modern
+// 1. PERBAIKAN TOOLTIP: Mengambil nama status dengan benar dari payload
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
-    const data = payload[0];
+    const data = payload[0].payload; // Ambil objek data asli (status, value, color)
     return (
-      <div className="bg-slate-900/90 dark:bg-slate-800/90 backdrop-blur-md text-white px-3 py-2 rounded-xl shadow-xl border border-slate-700 text-xs">
-        <p className="font-medium text-slate-300">{data.name || data.payload.status}</p>
-        <p className="text-sm font-bold mt-0.5">
+      <div className="bg-slate-900/90 dark:bg-slate-800/90 backdrop-blur-md text-white px-3 py-2 rounded-xl shadow-xl border border-slate-700/50 text-xs z-50">
+        <p className="font-semibold text-slate-200">{data.status}</p>
+        <p className="text-sm font-bold mt-0.5 text-indigo-400">
           {data.value} <span className="font-normal text-slate-400 text-xs">Tugas</span>
         </p>
       </div>
@@ -52,24 +52,47 @@ const CustomTooltip = ({ active, payload }) => {
   return null;
 };
 
+// 2. LABEL PERSENTASE DI DALAM CHART
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent === 0) return null; // Sembunyikan label jika nilainya 0
+
+  const RADIAN = Math.PI / 180;
+  // Hitung posisi tengah segmen donut
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-[11px] font-bold drop-shadow-md select-none"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
 export default function TaskChart({ tasks }) {
   const data = React.useMemo(() => getStatusCounts(tasks), [tasks]);
-  const [selected, setSelected] = React.useState(null);
+  const [, setSelected] = React.useState(null);
   const totalTasks = React.useMemo(() => data.reduce((acc, curr) => acc + curr.value, 0), [data]);
 
-  // Hook untuk mendeteksi mode Mobile (< 640px)
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkIsMobile = () => setIsMobile(window.innerWidth < 640);
-    checkIsMobile(); // Jalankan saat pertama kali mount
+    checkIsMobile();
     window.addEventListener('resize', checkIsMobile);
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
   return (
     <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-5 md:p-6 shadow-sm transition-all duration-300 hover:shadow-md mt-6">
-      {/* Header & Total Task Counter */}
+      {/* Header & Total Counter */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -93,18 +116,21 @@ export default function TaskChart({ tasks }) {
       <div className="w-full h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           {isMobile ? (
-            /* Mode Mobile: Donut / Pie Chart Modern */
+            /* MODE MOBILE: Donut Chart */
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={6}
+                cy="45%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={5}
                 dataKey="value"
+                nameKey="status" /* FIX: Memberitahu Recharts untuk membaca status sebagai nama legenda */
                 stroke="none"
-                cornerRadius={8}
+                cornerRadius={6}
+                labelLine={false}
+                label={renderCustomizedLabel} /* FIX: Menampilkan persenan di dalam chart */
               >
                 {data.map((entry, index) => (
                   <Cell
@@ -116,26 +142,21 @@ export default function TaskChart({ tasks }) {
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
+              {/* FIX LEGENDA: Menggunakan `entry.payload.status` agar tampil sesuai nama status */}
               <Legend
                 verticalAlign="bottom"
                 height={36}
                 iconType="circle"
-                formatter={(value) => (
+                formatter={(value, entry) => (
                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 ml-1">
-                    {value}
+                    {entry.payload.status}
                   </span>
                 )}
               />
             </PieChart>
           ) : (
-            /* Mode Desktop: Bar Chart Modern dengan Gradient & Rounded Bars */
+            /* MODE DESKTOP: Bar Chart */
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#818CF8" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.8} />
-                </linearGradient>
-              </defs>
               <CartesianGrid
                 strokeDasharray="4 4"
                 vertical={false}
@@ -154,28 +175,24 @@ export default function TaskChart({ tasks }) {
                 tickLine={false}
                 tick={{ fill: '#94A3B8', fontSize: 12 }}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(241, 245, 249, 0.5)' }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(241, 245, 249, 0.1)' }} />
               <Bar
                 dataKey="value"
                 name="Jumlah Tugas"
-                fill="url(#barGradient)"
                 radius={[10, 10, 0, 0]}
                 barSize={40}
               >
-                {/* Pewarnaan per-bar berdasarkan warna status */}
                 {data.map((entry, index) => (
-                  <Cell key={`bar-cell-${index}`} fill={entry.color} onClick={() => setSelected(entry)} />
+                  <Cell
+                    key={`bar-cell-${index}`}
+                    fill={entry.color}
+                    onClick={() => setSelected(entry)}
+                  />
                 ))}
               </Bar>
             </BarChart>
           )}
         </ResponsiveContainer>
-        {selected && selected.status !== "Selesai" && (
-          <div className="mt-2 text-center text-sm font-medium text-slate-700 dark:text-slate-300">
-            <div>{selected.status}</div>
-            <div>{selected.value} tugas</div>
-          </div>
-        )}
       </div>
     </div>
   );
