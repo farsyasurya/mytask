@@ -13,6 +13,11 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // Notification Security Rules
+    match /notifications/{notifId} {
+      allow create, read, update, delete: if request.auth != null;
+    }
+
     // Telegram Deep Link Tokens
     match /telegram_links/{linkId} {
       allow create, read, update: if request.auth != null;

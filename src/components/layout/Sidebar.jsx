@@ -17,7 +17,8 @@ import {
     Moon,
     Bell
 } from "lucide-react";
-import { subscribeNotifications } from "@/services/notificationService";
+import { getUserTasks } from "@/services/taskService";
+import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
 
 export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: externalToggleDarkMode }) {
     const pathname = usePathname();
@@ -38,15 +39,20 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
     });
 
     useEffect(() => {
-        const uid = user?.uid || userData?.id_user;
-        if (uid) {
-            const unsubscribe = subscribeNotifications(uid, (notifs) => {
-                const unread = (notifs || []).filter(n => !n.read).length;
-                setUnreadCount(unread);
-            });
-            return () => unsubscribe();
-        }
-    }, [user, userData]);
+        if (!user?.uid) return;
+
+        const loadReminders = async () => {
+            try {
+                const tasks = await getUserTasks(user.uid);
+                const activeReminders = getUpcomingTaskReminders(tasks);
+                setUnreadCount(activeReminders.length);
+            } catch (err) {
+                console.error("Gagal memuat pengingat tugas di sidebar:", err);
+            }
+        };
+
+        loadReminders();
+    }, [user?.uid]);
 
     const navItems = [
         { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },

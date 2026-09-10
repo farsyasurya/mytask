@@ -16,6 +16,7 @@ import {
     deleteTask,
     updateTaskStatus
 } from "@/services/taskService";
+import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
 
 function TasksContent() {
     const { user, userData, loading: authLoading } = useAuth();
@@ -59,6 +60,8 @@ function TasksContent() {
             const data = await getUserTasks(user.uid);
             setTasks(data || []);
             setFilteredTasks(data || []);
+            // Run check for mandatory & custom reminders
+            await checkAndUpdateTaskReminders(user.uid);
         } catch (err) {
             console.error("Gagal mengambil data task:", err);
         } finally {

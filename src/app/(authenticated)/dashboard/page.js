@@ -15,6 +15,7 @@ import {
 import TaskCard from "@/components/task/TaskCard";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserTasks, updateTaskStatus, deleteTask } from "@/services/taskService";
+import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
 
 export default function DashboardPage() {
     const { user, userData, loading: authLoading } = useAuth();
@@ -28,6 +29,8 @@ export default function DashboardPage() {
             setLoading(true);
             const data = await getUserTasks(user.uid);
             setTasks(data || []);
+            // Run check for mandatory & custom reminders
+            await checkAndUpdateTaskReminders(user.uid);
         } catch (err) {
             console.error("Gagal mengambil data task:", err);
         } finally {

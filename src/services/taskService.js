@@ -14,6 +14,7 @@ import {
     Timestamp,
     runTransaction
 } from "firebase/firestore";
+import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
 
 /**
  * Generates sequential task ID (TASK-000001 format)
@@ -71,6 +72,14 @@ export async function createTask(uid, userId, taskData) {
     };
 
     await setDoc(taskRef, payload);
+
+    // Trigger reminder check immediately for newly created task
+    try {
+        await checkAndUpdateTaskReminders(uid);
+    } catch (e) {
+        console.error("Auto reminder check error after createTask:", e);
+    }
+
     return { id: taskRef.id, ...payload };
 }
 
@@ -106,6 +115,15 @@ export async function updateTask(docId, taskData) {
     };
 
     await updateDoc(taskRef, updatePayload);
+
+    // Trigger reminder check immediately for updated task
+    if (taskData.uid) {
+        try {
+            await checkAndUpdateTaskReminders(taskData.uid);
+        } catch (e) {
+            console.error("Auto reminder check error after updateTask:", e);
+        }
+    }
 }
 
 export async function updateTaskStatus(docId, newStatus) {
