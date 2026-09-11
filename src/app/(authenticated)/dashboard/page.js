@@ -151,7 +151,7 @@ export default function DashboardPage() {
                         <div>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-                                    Selamat datang, {userData?.name || "Admin"}
+                                    Selamat datang, {userData?.nickname || (userData?.name ? userData.name.split(" ")[0] : "Admin")}
                                 </h1>
                             </div>
                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -410,7 +410,7 @@ export default function DashboardPage() {
 
                     <div>
                         <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-                            Selamat datang, {userData?.name || user?.displayName || user?.email?.split("@")[0] || ""}
+                            Selamat datang, {userData?.nickname || (userData?.name ? userData.name.split(" ")[0] : (user?.displayName ? user.displayName.split(" ")[0] : "User"))}
                             <Sparkles className="w-5 h-5 text-amber-500 fill-amber-500 shrink-0" />
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">

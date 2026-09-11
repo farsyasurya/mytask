@@ -389,7 +389,7 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
                                                 {displayName}
                                             </p>
                                             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                                {userData?.email || user?.email || "user@mytask.com"}
+                                                {userData?.email || user?.email || "user@taskify.com"}
                                             </p>
                                         </div>
                                     </div>

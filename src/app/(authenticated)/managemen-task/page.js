@@ -151,7 +151,7 @@ export default function ManagemenTaskPage() {
             `----------------------------------\n\n` +
             `✅ *SUDAH MENGERJAKAN (${doneStudents.length}):*\n${doneText}\n\n` +
             `❌ *BELUM MENGERJAKAN (${pendingStudents.length}):*\n${pendingText}\n\n` +
-            `👉 *Diharapkan mahasiswa yang belum segera menyelesaikan tugas di aplikasi MyTask!* 🙏`;
+            `👉 *Diharapkan mahasiswa yang belum segera menyelesaikan tugas di aplikasi TASKIFY!* 🙏`;
 
         const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
         window.open(waUrl, "_blank");

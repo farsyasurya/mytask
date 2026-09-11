@@ -35,16 +35,20 @@ export async function generateCustomUserId() {
     });
 }
 
-export async function createUserProfile(uid, name, email, kelas = "01TPLE002", role = "USER") {
+export async function createUserProfile(uid, name, email, kelas = "01TPLE002", role = "USER", nim = "", nickname = "") {
     const userRef = doc(db, "users", uid);
     const userSnap = await getDoc(userRef);
+
+    const defaultNickname = nickname ? nickname.trim() : (name ? name.trim().split(" ")[0] : "");
 
     if (!userSnap.exists()) {
         const customId = await generateCustomUserId();
         const userData = {
             uid: uid,
             id_user: customId,
-            name: name,
+            name: name ? name.trim() : "",
+            nickname: defaultNickname,
+            nim: nim ? nim.trim() : "",
             email: email,
             kelas: kelas || "01TPLE002",
             role: role || "USER",
@@ -61,9 +65,11 @@ export async function createUserProfile(uid, name, email, kelas = "01TPLE002", r
         return userData;
     }
     const data = userSnap.data();
-    // Default fallback values for legacy accounts without kelas / role
+    // Default fallback values for legacy accounts without kelas / role / nim / nickname
     return {
         ...data,
+        nickname: data.nickname || defaultNickname,
+        nim: data.nim || "",
         kelas: data.kelas || "01TPLE002",
         role: data.role || "USER"
     };
@@ -76,6 +82,8 @@ export async function getUserProfile(uid) {
         const data = userSnap.data();
         return {
             ...data,
+            nickname: data.nickname || (data.name ? data.name.trim().split(" ")[0] : ""),
+            nim: data.nim || "",
             kelas: data.kelas || "01TPLE002",
             role: data.role || "USER"
         };

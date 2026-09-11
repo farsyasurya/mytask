@@ -92,12 +92,14 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
 
                 {/* Logo Section */}
                 <div className={`flex items-center gap-3 mb-6 px-2 overflow-hidden ${isCollapsed ? "justify-center" : ""}`}>
-                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
-                        M
-                    </div>
+                    <img
+                        src="/my-logo.png"
+                        alt="TASKIFY Logo"
+                        className="w-12 h-12 object-contain shrink-0"
+                    />
                     {!isCollapsed && (
                         <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap transition-opacity duration-300">
-                            MyTask
+                            TASKIFY
                         </span>
                     )}
                 </div>

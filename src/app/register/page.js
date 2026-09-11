@@ -9,6 +9,8 @@ import { KELAS_OPTIONS } from "@/constants/kelas";
 
 export default function RegisterPage() {
     const [name, setName] = useState("");
+    const [nickname, setNickname] = useState("");
+    const [nim, setNim] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "");
@@ -51,7 +53,7 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            await register(name, email, password, kelas);
+            await register(name, email, password, kelas, "USER", nim, nickname);
             router.push("/dashboard");
         } catch (err) {
             setError("Gagal mendaftar. Pastikan email belum pernah terdaftar.");
@@ -69,7 +71,7 @@ export default function RegisterPage() {
                         alt="Taskify Logo"
                         width={28}
                         height={28}
-                        className="w-7 h-7 object-contain"
+                        className="w-12 h-12 object-contain"
                     />
                     <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm tracking-tight">
                         Taskify
@@ -122,13 +124,13 @@ export default function RegisterPage() {
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 transition-colors">
                     {/* Brand Logo & Heading */}
                     <div className="text-center mb-8">
-                        <div className="inline-flex p-3 rounded-xl bg-slate-100 dark:bg-slate-800 mb-4 border border-slate-200/50 dark:border-slate-700/50">
+                        <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 mb-4 border border-slate-200/50 dark:border-slate-700/50">
                             <Image
                                 src="/my-logo.png"
                                 alt="Taskify Logo"
                                 width={36}
                                 height={36}
-                                className="w-9 h-9 object-contain"
+                                className="w-20 h-20 object-contain"
                             />
                         </div>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -158,8 +160,38 @@ export default function RegisterPage() {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 className="w-full text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2.5 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-600 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                                placeholder="Nama kamu"
+                                placeholder="Contoh: M. Udin Sedunia"
                             />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Nama Panggilan
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={nickname}
+                                    onChange={(e) => setNickname(e.target.value)}
+                                    className="w-full text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2.5 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-600 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                    placeholder="Contoh: Udin"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    NIM (Nomor Induk Mahasiswa)
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={nim}
+                                    onChange={(e) => setNim(e.target.value)}
+                                    className="w-full text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2.5 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-600 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 font-mono"
+                                    placeholder="Contoh: 201011400123"
+                                />
+                            </div>
                         </div>
 
                         <div>

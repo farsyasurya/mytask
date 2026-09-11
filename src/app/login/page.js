@@ -67,7 +67,7 @@ export default function LoginPage() {
                         alt="Taskify Logo"
                         width={28}
                         height={28}
-                        className="w-7 h-7 object-contain"
+                        className="w-12 h-12 object-contain"
                     />
                     <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm tracking-tight">
                         Taskify
@@ -120,13 +120,13 @@ export default function LoginPage() {
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 transition-colors">
                     {/* Brand Logo & Heading */}
                     <div className="text-center mb-8">
-                        <div className="inline-flex p-3 rounded-xl bg-slate-100 dark:bg-slate-800 mb-4 border border-slate-200/50 dark:border-slate-700/50">
+                        <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 mb-4 border border-slate-200/50 dark:border-slate-700/50">
                             <Image
                                 src="/my-logo.png"
                                 alt="Taskify Logo"
-                                width={36}
-                                height={36}
-                                className="w-9 h-9 object-contain"
+                                width={20}
+                                height={20}
+                                className="w-20 h-20 object-contain"
                             />
                         </div>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">

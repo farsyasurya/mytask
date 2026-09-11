@@ -18,7 +18,7 @@ export default function MainLayout({ children }) {
             const savedTheme = localStorage.getItem("theme");
             const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
             const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
-            
+
             setIsDarkMode(shouldBeDark);
             if (shouldBeDark) {
                 document.documentElement.classList.add("dark");
@@ -54,8 +54,8 @@ export default function MainLayout({ children }) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
                 <div className="flex flex-col items-center gap-3">
-                    <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs text-slate-500 font-medium">Memuat MyTask...</p>
+                    <img src="/my-logo.png" alt="TASKIFY Logo" className="w-20 h-20 object-contain animate-pulse" />
+                    <p className="text-xs text-slate-500 font-medium">Memuat TASKIFY...</p>
                 </div>
             </div>
         );

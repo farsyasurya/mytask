@@ -3,13 +3,13 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ReminderModal from "@/components/notification/ReminderModal";
 
 export const metadata = {
-  title: "MyTask - Manajemen Tugas Kuliah",
-  description: "Aplikasi manajemen tugas kuliah pribadi dengan notifikasi Telegram",
+  title: "TASKIFY - Manajemen Tugas Kuliah",
+  description: "Aplikasi manajemen tugas kuliah",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MyTask",
+    title: "TASKIFY",
   },
 };
 

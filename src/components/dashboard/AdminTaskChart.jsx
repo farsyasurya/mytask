@@ -120,9 +120,6 @@ export default function AdminTaskChart({ adminTaskGroups = [] }) {
         <div>
           <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
             Analisis Progres Tugas Kelas
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-              {isMobile ? "Grafik Donut" : "Grafik Batang Per Matkul"}
-            </span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {isMobile

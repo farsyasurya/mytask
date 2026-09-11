@@ -44,9 +44,9 @@ export const AuthProvider = ({ children }) => {
         return signInWithEmailAndPassword(auth, email, password);
     };
 
-    const register = async (name, email, password, kelas = "", role = "USER") => {
+    const register = async (name, email, password, kelas = "", role = "USER", nim = "", nickname = "") => {
         const res = await createUserWithEmailAndPassword(auth, email, password);
-        await createUserProfile(res.user.uid, name, email, kelas, role);
+        await createUserProfile(res.user.uid, name, email, kelas, role, nim, nickname);
         const profile = await getUserProfile(res.user.uid);
         setUserData(profile);
         return res;

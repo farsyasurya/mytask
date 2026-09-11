@@ -125,7 +125,7 @@ export default function TaskAdminPage() {
             `🏷️ *Jenis:* ${jenisText}\n` +
             `⏰ *Deadline:* ${formattedDeadline} WIB\n\n` +
             `📄 *Deskripsi / Instruksi:*\n${successData.deskripsi || "-"}\n\n` +
-            `👉 *Segera cek dan selesaikan tugasmu di aplikasi MyTask!* 🚀`;
+            `👉 *Segera cek dan selesaikan tugasmu di aplikasi TASKIFY!* 🚀`;
 
         const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
         window.open(waUrl, "_blank");
@@ -352,7 +352,7 @@ export default function TaskAdminPage() {
                     ) : (
                         <>
                             <Send className="w-4 h-4" />
-                            <span>Buat & Distribusikan Tugas ke Kelas {userData?.kelas || kelas}</span>
+                            <span>Distribusikan Tugas ke {userData?.kelas || kelas}</span>
                         </>
                     )}
                 </button>
