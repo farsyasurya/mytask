@@ -1,29 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Hash, Send, AlertTriangle, ShieldCheck } from "lucide-react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { User, Mail, Hash, ShieldCheck, Edit3, Save, X, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { updateProfile } from "firebase/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
-import { createTelegramLinkToken, disconnectTelegram } from "@/services/telegramService";
 
 export default function ProfilePage() {
     const { userData: initialUserData, user, refreshUserData, loading: authLoading } = useAuth();
 
-    // State lokal untuk profile agar UI bisa langsung dirender tanpa nunggu Firestore
     const [profile, setProfile] = useState(initialUserData);
-    const [loading, setLoading] = useState(false);
-    const [disconnecting, setDisconnecting] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [nameInput, setNameInput] = useState("");
+    const [saving, setSaving] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
 
-    // Synchronize state lokal jika initialUserData berubah dari AuthContext
+    // Sinkronkan state lokal saat data AuthContext dimuat/berubah
     useEffect(() => {
         if (initialUserData) {
             setProfile(initialUserData);
+            setNameInput(initialUserData.name || user?.displayName || "");
         }
-    }, [initialUserData]);
+    }, [initialUserData, user]);
 
-    // 🚀 Realtime Listener: Begitu user berhasil connect Telegram di bot, UI otomatis update instan!
+    // Realtime Listener Firestore untuk update instan
     useEffect(() => {
         if (!user?.uid) return;
 
@@ -32,7 +34,11 @@ export default function ProfilePage() {
             userDocRef,
             (docSnap) => {
                 if (docSnap.exists()) {
-                    setProfile(docSnap.data());
+                    const data = docSnap.data();
+                    setProfile(data);
+                    if (!isEditing) {
+                        setNameInput(data.name || user?.displayName || "");
+                    }
                 }
             },
             (error) => {
@@ -41,82 +47,85 @@ export default function ProfilePage() {
         );
 
         return () => unsubscribe();
-    }, [user?.uid]);
+    }, [user?.uid, isEditing, user?.displayName]);
 
-    const handleConnectTelegram = async () => {
-        const activeUserId = profile?.id_user || user?.uid;
+    const handleSaveProfile = async (e) => {
+        e.preventDefault();
+        if (!user?.uid) return;
 
-        if (!user?.uid || !activeUserId) {
-            setErrorMessage("Data pengguna belum siap, silakan coba lagi.");
+        const trimmedName = nameInput.trim();
+        if (!trimmedName) {
+            setErrorMessage("Nama tidak boleh kosong.");
             return;
         }
 
-        setLoading(true);
+        setSaving(true);
         setErrorMessage("");
-        try {
-            const token = await createTelegramLinkToken(user.uid, activeUserId);
-            const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+        setSuccessMessage("");
 
-            if (!botUsername) {
-                throw new Error("Telegram bot username belum dikonfigurasi");
+        try {
+            // Update nama di Firebase Auth
+            if (user) {
+                await updateProfile(user, { displayName: trimmedName });
             }
 
-            window.open(
-                `https://t.me/${botUsername}?start=${token}`,
-                "_blank"
-            );
-        } catch (err) {
-            console.error("Gagal menghubungkan Telegram:", err);
-            setErrorMessage("Gagal membuat tautan koneksi Telegram. Coba lagi nanti.");
-        } finally {
-            setLoading(false);
-        }
-    };
+            // Update nama di dokumen Firestore users/{uid}
+            const userDocRef = doc(db, "users", user.uid);
+            await updateDoc(userDocRef, {
+                name: trimmedName,
+                updatedAt: new Date().toISOString()
+            });
 
-    const handleDisconnectTelegram = async () => {
-        if (!confirm("Putuskan koneksi Telegram? Notifikasi pengingat tugas tidak akan dikirim lagi.")) {
-            return;
-        }
-
-        setDisconnecting(true);
-        setErrorMessage("");
-        try {
-            await disconnectTelegram(user.uid);
             await refreshUserData();
+            setSuccessMessage("Profil berhasil diperbarui!");
+            setIsEditing(false);
         } catch (err) {
-            console.error("Gagal memutuskan Telegram:", err);
-            setErrorMessage("Gagal memutuskan koneksi Telegram.");
+            console.error("Gagal memperbarui profil:", err);
+            setErrorMessage("Gagal memperbarui profil. Coba lagi nanti.");
         } finally {
-            setDisconnecting(false);
+            setSaving(false);
         }
     };
 
-    const isConnected = Boolean(profile?.telegram?.connected);
+    const handleCancelEdit = () => {
+        setNameInput(profile?.name || user?.displayName || "");
+        setIsEditing(false);
+        setErrorMessage("");
+    }
 
     if (authLoading && !user) {
         return (
-            <div className="max-w-4xl w-full animate-pulse space-y-6">
+            <div className="w-full animate-pulse space-y-6">
                 <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-48" />
-                <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full" />
-                <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full" />
+                <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full" />
             </div>
         );
     }
 
     const displayName = profile?.name || user?.displayName || "User";
     const displayEmail = profile?.email || user?.email || "-";
-    const displayIdUser = profile?.id_user || user?.uid?.substring(0, 8) || "-";
+    const displayIdUser = profile?.id_user || user?.uid || "-";
 
     return (
-        <div className="max-w-4xl w-full space-y-6">
-            <div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Profil Saya</h1>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Kelola informasi akun dan integrasi layanan notifikasi
-                </p>
+        <div className="w-full space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Profil Saya</h1>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                        Kelola informasi akun dan pengaturan profil Anda
+                    </p>
+                </div>
+                {!isEditing && (
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-all active:scale-95"
+                    >
+                        <Edit3 className="w-4 h-4" /> Edit Profil
+                    </button>
+                )}
             </div>
 
-            {/* Alert Pesan Error */}
+            {/* Alert Status */}
             {errorMessage && (
                 <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 flex items-center gap-3 text-rose-700 dark:text-rose-300 text-xs sm:text-sm animate-in fade-in">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-600 dark:text-rose-400" />
@@ -124,118 +133,109 @@ export default function ProfilePage() {
                 </div>
             )}
 
-            {/* Card Informasi Profil */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm transition-all space-y-6">
-                <div className="flex items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white font-bold text-xl flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-none">
+            {successMessage && (
+                <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center gap-3 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm animate-in fade-in">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>{successMessage}</span>
+                </div>
+            )}
+
+            {/* Card utama full-width */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm transition-all space-y-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 border-b border-slate-100 dark:border-slate-800 pb-6">
+                    <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-none flex-shrink-0">
                         {displayName.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                    <div className="space-y-1">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
                             {displayName}
                         </h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Akun Terverifikasi
+                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Akun Terverifikasi
                         </p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                        <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mb-1">
-                            <User className="w-3.5 h-3.5" /> Nama Lengkap
-                        </label>
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {displayName}
-                        </p>
-                    </div>
-
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                        <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mb-1">
-                            <Mail className="w-3.5 h-3.5" /> Email
-                        </label>
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-                            {displayEmail}
-                        </p>
-                    </div>
-
-                    <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
-                        <label className="text-[11px] font-semibold text-indigo-500 dark:text-indigo-400 flex items-center gap-1.5 mb-1">
-                            <Hash className="w-3.5 h-3.5" /> ID User
-                        </label>
-                        <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 font-mono truncate">
-                            {displayIdUser}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Card Telegram Bot */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm transition-all space-y-4">
-                <div className="flex items-center gap-2">
-                    <Send className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">
-                        Pengaturan Telegram Bot
-                    </h2>
-                </div>
-
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Hubungkan akun Telegram untuk menerima notifikasi pengingat tenggat waktu secara *real-time*.
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <div>
-                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">
-                            Status Koneksi
-                        </p>
-                        {isConnected ? (
-                            <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                </span>
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                                    Terhubung
-                                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                                        (@{profile?.telegram?.username || "user"})
-                                    </span>
-                                </span>
+                {/* Form / Grid Info */}
+                {isEditing ? (
+                    <form onSubmit={handleSaveProfile} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                    <User className="w-4 h-4 text-indigo-500" /> Nama Lengkap
+                                </label>
+                                <input
+                                    type="text"
+                                    value={nameInput}
+                                    onChange={(e) => setNameInput(e.target.value)}
+                                    placeholder="Masukkan nama lengkap"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                                    required
+                                />
                             </div>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                    Belum Terhubung
-                                </span>
-                            </div>
-                        )}
-                    </div>
 
-                    {isConnected ? (
-                        <button
-                            onClick={handleDisconnectTelegram}
-                            disabled={disconnecting}
-                            className="w-full sm:w-auto px-4 py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 rounded-xl text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all active:scale-95 disabled:opacity-50"
-                        >
-                            {disconnecting ? "Memutuskan..." : "Putuskan Telegram"}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleConnectTelegram}
-                            disabled={loading}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                "Memproses..."
-                            ) : (
-                                <>
-                                    <Send className="w-3.5 h-3.5" />
-                                    Hubungkan Telegram
-                                </>
-                            )}
-                        </button>
-                    )}
-                </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                                    <Mail className="w-4 h-4" /> Email (Tidak dapat diubah)
+                                </label>
+                                <input
+                                    type="email"
+                                    value={displayEmail}
+                                    disabled
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 text-sm cursor-not-allowed"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                disabled={saving}
+                                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center gap-1.5"
+                            >
+                                <X className="w-4 h-4" /> Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                            >
+                                <Save className="w-4 h-4" />
+                                {saving ? "Menyimpan..." : "Simpan Perubahan"}
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mb-1.5">
+                                <User className="w-4 h-4" /> Nama Lengkap
+                            </label>
+                            <p className="text-base font-bold text-slate-800 dark:text-slate-200 truncate">
+                                {displayName}
+                            </p>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <label className="text-xs font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mb-1.5">
+                                <Mail className="w-4 h-4" /> Email
+                            </label>
+                            <p className="text-base font-bold text-slate-800 dark:text-slate-200 truncate">
+                                {displayEmail}
+                            </p>
+                        </div>
+
+                        <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
+                            <label className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 flex items-center gap-1.5 mb-1.5">
+                                <Hash className="w-4 h-4" /> ID User
+                            </label>
+                            <p className="text-base font-bold text-indigo-600 dark:text-indigo-400 font-mono truncate">
+                                {displayIdUser}
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
