@@ -190,7 +190,7 @@ function TasksContent() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-                        Daftar Task
+                        Daftar Tugas
                         <Sparkles className="w-5 h-5 text-indigo-500 fill-indigo-500/20" />
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
