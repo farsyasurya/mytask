@@ -15,6 +15,7 @@ import {
     runTransaction
 } from "firebase/firestore";
 import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
+import { createStudentTaskNotifications } from "@/services/notificationService";
 
 /**
  * Generates sequential task ID (TASK-000001 format)
@@ -211,6 +212,13 @@ export async function createAdminTaskForClass(selectedKelas, taskData) {
 
             await setDoc(taskRef, payload);
             createdTasks.push({ id: taskRef.id, ...payload });
+        }
+
+        // Trigger notification creation for all target students in the background
+        try {
+            await createStudentTaskNotifications(targetUsers, taskData, broadcastId);
+        } catch (errNotif) {
+            console.error("Gagal mengirimkan notifikasi ke mahasiswa:", errNotif);
         }
 
         return {

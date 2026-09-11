@@ -7,6 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import TaskCard from "@/components/task/TaskCard";
 import TaskModal from "@/components/task/TaskModal";
+import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
+import Pagination from "@/components/common/Pagination";
+import MobileFilterDialog from "@/components/common/MobileFilterDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { MATA_KULIAH } from "@/constants/mataKuliah";
 import {
@@ -20,6 +23,15 @@ import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
 
 function TasksContent() {
     const { user, userData, loading: authLoading } = useAuth();
+    const router = useRouter();
+
+    // Redirect ADMIN to /managemen-task
+    useEffect(() => {
+        if (!authLoading && userData?.role === "ADMIN") {
+            router.replace("/managemen-task");
+        }
+    }, [userData, authLoading, router]);
+
     const [tasks, setTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -38,7 +50,19 @@ function TasksContent() {
     const [filterMatkul, setFilterMatkul] = useState("");
     const [filterStatus, setFilterStatus] = useState("");
 
-    const router = useRouter();
+    // Period Filter State
+    const [selectedPeriod, setSelectedPeriod] = useState("all");
+    const [customStartDate, setCustomStartDate] = useState("");
+    const [customEndDate, setCustomEndDate] = useState("");
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(12);
+
+    // Reset pagination on filter change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filterMatkul, filterStatus, selectedPeriod, customStartDate, customEndDate]);
 
     // Sync search from URL query if changed from TopNav
     useEffect(() => {
@@ -97,10 +121,16 @@ function TasksContent() {
             if (filterStatus) {
                 result = result.filter((t) => t.status === filterStatus);
             }
+
+            result = filterItemsByPeriod(result, selectedPeriod, (t) => t.deadline, customStartDate, customEndDate);
         }
 
         setFilteredTasks(result);
-    }, [search, filterMatkul, filterStatus, taskIdParam, tasks]);
+    }, [search, filterMatkul, filterStatus, taskIdParam, tasks, selectedPeriod, customStartDate, customEndDate]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredTasks.length / pageSize) || 1;
+    const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const handleSave = async (formData) => {
         if (!user) return;
@@ -146,7 +176,7 @@ function TasksContent() {
         }
     };
 
-    if (authLoading || loading) {
+    if (authLoading || loading || userData?.role === "ADMIN") {
         return (
             <div className="animate-pulse space-y-6">
                 <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full" />
@@ -197,63 +227,72 @@ function TasksContent() {
                         Kelola dan pantau seluruh tugas kuliahmu
                     </p>
                 </div>
-                {userData?.role === "ADMIN" && (
-                    <button
-                        onClick={() => {
-                            setTaskToEdit(null);
-                            setIsModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-500/20"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Tambah Task
-                    </button>
-                )}
+
+                {/* Period Filter */}
+                <MobileFilterDialog title="Filter" activeCount={(filterMatkul || filterStatus || selectedPeriod !== "all") ? 1 : 0}>
+                    <div className="space-y-4">
+                        <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                                Filter Periode Deadline:
+                            </span>
+                            <PeriodFilter
+                                selectedPeriod={selectedPeriod}
+                                onPeriodChange={setSelectedPeriod}
+                                customStartDate={customStartDate}
+                                customEndDate={customEndDate}
+                                onStartDateChange={setCustomStartDate}
+                                onEndDateChange={setCustomEndDate}
+                            />
+                        </div>
+
+                        {/* Filter Controls Bar */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {/* Filter Matkul Dropdown */}
+                            <div className="relative flex items-center group">
+                                <Filter className="w-4 h-4 absolute left-3.5 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" />
+                                <select
+                                    value={filterMatkul}
+                                    onChange={(e) => setFilterMatkul(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none cursor-pointer active:scale-[0.99]"
+                                >
+                                    <option value="" className="dark:bg-slate-900">Semua Mata Kuliah</option>
+                                    {MATA_KULIAH.map((m) => (
+                                        <option key={m} value={m} className="dark:bg-slate-900">{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Filter Status Dropdown */}
+                            <div className="relative flex items-center sm:col-span-2 md:col-span-1 group">
+                                <Filter className="w-4 h-4 absolute left-3.5 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" />
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none cursor-pointer active:scale-[0.99]"
+                                >
+                                    <option value="" className="dark:bg-slate-900">Semua Status</option>
+                                    <option value="new" className="dark:bg-slate-900">New</option>
+                                    <option value="on_progress" className="dark:bg-slate-900">On Progress</option>
+                                    <option value="reject" className="dark:bg-slate-900">Reject</option>
+                                    <option value="done" className="dark:bg-slate-900">Done</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </MobileFilterDialog>
             </div>
 
-            {/* Filter Controls Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                {/* Search Input */}
+            {/* Search Bar Input */}
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="relative flex items-center group">
                     <Search className="w-4 h-4 absolute left-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                     <input
                         type="text"
-                        placeholder="Cari tugas..."
+                        placeholder="Cari tugas berdasarkan judul atau deskripsi..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-10 pr-3 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                     />
-                </div>
-
-                {/* Filter Matkul Dropdown */}
-                <div className="relative flex items-center group">
-                    <Filter className="w-4 h-4 absolute left-3.5 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" />
-                    <select
-                        value={filterMatkul}
-                        onChange={(e) => setFilterMatkul(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none cursor-pointer active:scale-[0.99]"
-                    >
-                        <option value="" className="dark:bg-slate-900">Semua Mata Kuliah</option>
-                        {MATA_KULIAH.map((m) => (
-                            <option key={m} value={m} className="dark:bg-slate-900">{m}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Filter Status Dropdown */}
-                <div className="relative flex items-center sm:col-span-2 md:col-span-1 group">
-                    <Filter className="w-4 h-4 absolute left-3.5 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" />
-                    <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none cursor-pointer active:scale-[0.99]"
-                    >
-                        <option value="" className="dark:bg-slate-900">Semua Status</option>
-                        <option value="new" className="dark:bg-slate-900">New</option>
-                        <option value="on_progress" className="dark:bg-slate-900">On Progress</option>
-                        <option value="reject" className="dark:bg-slate-900">Reject</option>
-                        <option value="done" className="dark:bg-slate-900">Done</option>
-                    </select>
                 </div>
             </div>
 
@@ -264,21 +303,9 @@ function TasksContent() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-12 text-center"
                 >
-                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                         Belum ada task yang sesuai dengan kriteria filter.
                     </p>
-                    {userData?.role === "ADMIN" && (
-                        <button
-                            onClick={() => {
-                                setTaskToEdit(null);
-                                setIsModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-semibold rounded-xl text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Tambah Task Pertama
-                        </button>
-                    )}
                 </motion.div>
             ) : (
                 <motion.div
@@ -286,7 +313,7 @@ function TasksContent() {
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4"
                 >
                     <AnimatePresence>
-                        {filteredTasks.map((task) => (
+                        {paginatedTasks.map((task) => (
                             <motion.div
                                 key={task.id}
                                 layout
@@ -309,6 +336,18 @@ function TasksContent() {
                         ))}
                     </AnimatePresence>
                 </motion.div>
+            )}
+
+            {/* Pagination Controls */}
+            {filteredTasks.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
+                    totalItems={filteredTasks.length}
+                />
             )}
 
             {/* Task Modal */}

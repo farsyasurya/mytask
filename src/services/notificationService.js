@@ -5,10 +5,13 @@ import {
     where,
     updateDoc,
     doc,
+    setDoc,
+    getDocs,
+    serverTimestamp,
     onSnapshot
 } from "firebase/firestore";
 
-// Realtime Listener untuk Badge Angka & Popup (Client-side sorting agar tidak error karena missing composite index)
+// Realtime Listener untuk Notifikasi User (Client-side sorting)
 export const subscribeNotifications = (userId, callback) => {
     if (!userId) return () => {};
 
@@ -22,7 +25,6 @@ export const subscribeNotifications = (userId, callback) => {
         (snapshot) => {
             const notifs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
             
-            // Sort client-side secara desc berdasarkan waktu dibuat (createdAt)
             notifs.sort((a, b) => {
                 const ta = a.createdAt?.seconds
                     ? a.createdAt.seconds * 1000
@@ -41,7 +43,30 @@ export const subscribeNotifications = (userId, callback) => {
     );
 };
 
-// Tandai notifikasi sebagai dibaca
+// Kirim dokumen notifikasi tugas baru dari Admin ke tiap mahasiswa di kelas
+export const createStudentTaskNotifications = async (targetUsers, taskData, broadcastId) => {
+    try {
+        for (const u of targetUsers) {
+            const notifRef = doc(collection(db, "notifications"));
+            await setDoc(notifRef, {
+                userId: u.uid || u.id,
+                type: "new_task",
+                category: "Tugas Baru",
+                title: `📌 Tugas Baru: ${taskData.judul}`,
+                message: `Admin telah merilis tugas baru untuk ${taskData.matkul} Pertemuan ${taskData.pertemuan}. Deadline: ${new Date(taskData.deadline).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB.`,
+                matkul: taskData.matkul,
+                pertemuan: taskData.pertemuan,
+                broadcast_id: broadcastId,
+                read: false,
+                createdAt: serverTimestamp()
+            });
+        }
+    } catch (err) {
+        console.error("Gagal membuat dokumen notifikasi tugas baru:", err);
+    }
+};
+
+// Tandai notifikasi sebagai dibaca di Firestore
 export const markAsRead = async (notifId) => {
     try {
         const ref = doc(db, "notifications", notifId);

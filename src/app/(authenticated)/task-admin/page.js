@@ -27,7 +27,7 @@ export default function TaskAdminPage() {
     const { userData, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "01TPLE002");
+    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "");
     const [judul, setJudul] = useState("");
     const [matkul, setMatkul] = useState(MATA_KULIAH[0] || "");
     const [pertemuan, setPertemuan] = useState(1);
@@ -86,7 +86,8 @@ export default function TaskAdminPage() {
                 deskripsi
             };
 
-            const result = await createAdminTaskForClass(kelas, formData);
+            const targetClass = userData?.kelas || kelas;
+            const result = await createAdminTaskForClass(targetClass, formData);
             setSuccessData({
                 ...formData,
                 totalDistributed: result.totalDistributed,
@@ -202,23 +203,18 @@ export default function TaskAdminPage() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Select Kelas Target */}
+                    {/* Target Kelas (Disabled, locked to Admin class) */}
                     <div>
                         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
                             <Users className="w-4 h-4 text-indigo-500" />
-                            Target Kelas
+                            Target Kelas (Kelas Admin)
                         </label>
-                        <select
-                            value={kelas}
-                            onChange={(e) => setKelas(e.target.value)}
-                            className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-semibold text-indigo-600 dark:text-indigo-400"
-                        >
-                            {KELAS_OPTIONS.map((k) => (
-                                <option key={k} value={k} className="dark:bg-slate-900">
-                                    Kelas {k}
-                                </option>
-                            ))}
-                        </select>
+                        <input
+                            type="text"
+                            disabled
+                            value={`Kelas ${userData?.kelas || kelas}`}
+                            className="w-full text-xs sm:text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 font-bold text-indigo-600 dark:text-indigo-400 cursor-not-allowed opacity-90"
+                        />
                     </div>
 
                     {/* Select Mata Kuliah */}
@@ -356,7 +352,7 @@ export default function TaskAdminPage() {
                     ) : (
                         <>
                             <Send className="w-4 h-4" />
-                            <span>Buat & Distribusikan Tugas ke Kelas {kelas}</span>
+                            <span>Buat & Distribusikan Tugas ke Kelas {userData?.kelas || kelas}</span>
                         </>
                     )}
                 </button>

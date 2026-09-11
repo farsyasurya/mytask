@@ -1,48 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Clock, ArrowRight, BookOpen, CheckCircle2, Megaphone, Info } from "lucide-react";
+import { Bell, Clock, ArrowRight, BookOpen, CheckCircle2, Megaphone, Info, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getUserTasks } from "@/services/taskService";
+import { getUserTasks, getAdminManagementTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { subscribeNotifications, markAsRead } from "@/services/notificationService";
+import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
+import Pagination from "@/components/common/Pagination";
 
 export default function NotificationPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState("deadline");
+    const isAdmin = userData?.role === "ADMIN";
+
+    const [activeTab, setActiveTab] = useState(isAdmin ? "admin_attention" : "deadline");
     const [reminders, setReminders] = useState([]);
+    const [taskNotifications, setTaskNotifications] = useState([]);
     const [adminAnnouncements, setAdminAnnouncements] = useState([]);
+    const [adminAttentionTasks, setAdminAttentionTasks] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Tracking status dibaca (disimpan di localStorage agar persistent di client)
-    const [readIds, setReadIds] = useState([]);
+    // Period Filter State
+    const [selectedPeriod, setSelectedPeriod] = useState("all");
+    const [customStartDate, setCustomStartDate] = useState("");
+    const [customEndDate, setCustomEndDate] = useState("");
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset pagination on tab / filter changes
     useEffect(() => {
-        const localRead = localStorage.getItem("read_notifications");
-        if (localRead) {
-            try {
-                setReadIds(JSON.parse(localRead));
-            } catch (e) {
-                console.error("Error parsing read_notifications", e);
-            }
-        }
-    }, []);
+        setCurrentPage(1);
+    }, [activeTab, selectedPeriod, customStartDate, customEndDate]);
 
-    const markAsRead = (id) => {
-        if (!readIds.includes(id)) {
-            const updated = [...readIds, id];
-            setReadIds(updated);
-            localStorage.setItem("read_notifications", JSON.stringify(updated));
+    // Set default tab on load based on role
+    useEffect(() => {
+        if (isAdmin && activeTab === "deadline") {
+            setActiveTab("admin_attention");
         }
-    };
+    }, [isAdmin]);
 
-    // 1. Fetch Task Reminders
+    // 1. Student Realtime Notifications (Tugas Baru) & Reminders
     useEffect(() => {
         if (!user?.uid) return;
+
+        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+            setTaskNotifications(notifs || []);
+        });
 
         const loadReminders = async () => {
             try {
@@ -52,15 +62,48 @@ export default function NotificationPage() {
                 setReminders(activeReminders);
             } catch (err) {
                 console.error("Gagal mengambil data pengingat:", err);
+            } flex: {
+                setLoading(false);
+            }
+        };
+
+        if (!isAdmin) {
+            loadReminders();
+        }
+
+        return () => unsubscribe();
+    }, [user?.uid, isAdmin]);
+
+    // 2. Admin Attention Tasks (Tasks with deadline approaching and progress < 100%)
+    useEffect(() => {
+        if (!isAdmin || !userData?.kelas) return;
+
+        const loadAdminAttention = async () => {
+            try {
+                setLoading(true);
+                const classTasks = await getAdminManagementTasks(userData.kelas);
+                const now = new Date();
+                const threeDays = 3 * 24 * 60 * 60 * 1000;
+
+                const attentionList = (classTasks || []).filter((t) => {
+                    if (t.progressPercent >= 100) return false;
+                    const d = t.deadline?.seconds ? new Date(t.deadline.seconds * 1000) : new Date(t.deadline);
+                    const diff = d - now;
+                    return diff > 0 && diff <= threeDays;
+                });
+
+                setAdminAttentionTasks(attentionList);
+            } catch (err) {
+                console.error("Gagal memuat tugas perhatian admin:", err);
             } finally {
                 setLoading(false);
             }
         };
 
-        loadReminders();
-    }, [user?.uid]);
+        loadAdminAttention();
+    }, [isAdmin, userData?.kelas]);
 
-    // 2. Realtime listener pengumuman dari Admin Kelas
+    // 3. Realtime listener announcements
     useEffect(() => {
         if (!user?.uid) return;
 
@@ -85,25 +128,51 @@ export default function NotificationPage() {
         return () => unsubscribe();
     }, [user?.uid]);
 
-    const handleReminderClick = (notif) => {
-        markAsRead(notif.id);
-        if (notif.taskId) {
-            router.push(`/tasks?id=${notif.taskId}`);
+    // Handling click on notification item -> Firestore markAsRead
+    const handleNotifClick = async (notif) => {
+        if (notif.id && !notif.read) {
+            await markAsRead(notif.id);
+        }
+        if (notif.broadcast_id || notif.taskId) {
+            router.push(`/tasks?id=${notif.broadcast_id || notif.taskId}`);
         } else {
             router.push("/tasks");
         }
     };
 
-    const handleAdminClick = (announcement) => {
-        markAsRead(announcement.id);
-        if (announcement.link) {
-            router.push(announcement.link);
+    const handleAdminAttentionClick = (task) => {
+        router.push("/managemen-task");
+    };
+
+    // Filter by period
+    const getFilteredList = () => {
+        let rawList = [];
+
+        if (isAdmin) {
+            if (activeTab === "admin_attention") {
+                rawList = adminAttentionTasks;
+                return filterItemsByPeriod(rawList, selectedPeriod, (item) => item.deadline, customStartDate, customEndDate);
+            } else {
+                rawList = adminAnnouncements;
+                return filterItemsByPeriod(rawList, selectedPeriod, (item) => item.createdAt, customStartDate, customEndDate);
+            }
+        } else {
+            if (activeTab === "deadline") {
+                rawList = reminders;
+                return filterItemsByPeriod(rawList, selectedPeriod, (item) => item.deadline, customStartDate, customEndDate);
+            } else {
+                rawList = taskNotifications;
+                return filterItemsByPeriod(rawList, selectedPeriod, (item) => item.createdAt, customStartDate, customEndDate);
+            }
         }
     };
 
-    // Menghitung jumlah notifikasi yang BELUM DIBACA
-    const unreadDeadlineCount = reminders.filter((r) => !readIds.includes(r.id)).length;
-    const unreadAdminCount = adminAnnouncements.filter((a) => !readIds.includes(a.id)).length;
+    const filteredItems = getFilteredList();
+    const totalPages = Math.ceil(filteredItems.length / pageSize) || 1;
+    const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+    // Unread Counts
+    const unreadStudentNotifCount = taskNotifications.filter((n) => !n.read).length;
 
     if (loading) {
         return (
@@ -126,57 +195,177 @@ export default function NotificationPage() {
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
                         <Bell className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                        Pusat Notifikasi
+                        Pusat Notifikasi {isAdmin ? "(Admin)" : ""}
                     </h1>
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Pantau pengingat tenggat waktu tugas dan pengumuman resmi admin kelas
+                        {isAdmin
+                            ? "Pantau tugas kelas yang mendekati deadline dan belum 100% selesai"
+                            : "Pantau pengingat tenggat waktu tugas dan pemberitahuan tugas baru"}
                     </p>
                 </div>
+
+                {/* Period Filter */}
+                <PeriodFilter
+                    selectedPeriod={selectedPeriod}
+                    onPeriodChange={setSelectedPeriod}
+                    customStartDate={customStartDate}
+                    customEndDate={customEndDate}
+                    onStartDateChange={setCustomStartDate}
+                    onEndDateChange={setCustomEndDate}
+                />
             </div>
 
             {/* Tab Navigation */}
             <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 sm:gap-6 overflow-x-auto">
-                <button
-                    onClick={() => setActiveTab("deadline")}
-                    className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "deadline"
-                        ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                        }`}
-                >
-                    <BookOpen className="w-4 h-4" />
-                    Mendekati Deadline
-                    {unreadDeadlineCount > 0 && (
-                        <span className="flex h-2.5 w-2.5 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
-                        </span>
-                    )}
-                </button>
+                {isAdmin ? (
+                    <>
+                        <button
+                            onClick={() => setActiveTab("admin_attention")}
+                            className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "admin_attention"
+                                    ? "border-amber-600 text-amber-600 dark:text-amber-400"
+                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                        >
+                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                            Perhatian Admin (Tugas Belum 100%)
+                            {adminAttentionTasks.length > 0 && (
+                                <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 text-xs font-bold">
+                                    {adminAttentionTasks.length}
+                                </span>
+                            )}
+                        </button>
 
-                <button
-                    onClick={() => setActiveTab("admin")}
-                    className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "admin"
-                        ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                        }`}
-                >
-                    <Megaphone className="w-4 h-4" />
-                    Tugas Baru
-                    {unreadAdminCount > 0 && (
-                        <span className="flex h-2.5 w-2.5 relative">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
-                        </span>
-                    )}
-                </button>
+                        <button
+                            onClick={() => setActiveTab("admin_announcements")}
+                            className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "admin_announcements"
+                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                        >
+                            <Megaphone className="w-4 h-4" />
+                            Pengumuman Kelas
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            onClick={() => setActiveTab("deadline")}
+                            className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "deadline"
+                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                        >
+                            <BookOpen className="w-4 h-4" />
+                            Mendekati Deadline
+                            {reminders.length > 0 && (
+                                <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold">
+                                    {reminders.length}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => setActiveTab("new_tasks")}
+                            className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "new_tasks"
+                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                        >
+                            <Megaphone className="w-4 h-4" />
+                            Tugas Baru (Notifikasi)
+                            {unreadStudentNotifCount > 0 && (
+                                <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-xs font-bold animate-pulse">
+                                    {unreadStudentNotifCount}
+                                </span>
+                            )}
+                        </button>
+                    </>
+                )}
             </div>
 
             {/* Content Section */}
             <div className="space-y-3">
-                {/* TAB 1: PENGINGAT DEADLINE */}
-                {activeTab === "deadline" && (
+                {/* ADMIN TAB 1: PERHATIAN ADMIN */}
+                {isAdmin && activeTab === "admin_attention" && (
                     <>
-                        {reminders.length === 0 ? (
+                        {paginatedItems.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-12 text-center space-y-3">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                                    <CheckCircle2 className="w-6 h-6" />
+                                </div>
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                    🎉 Semua Tugas Kelas Aman
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                                    Tidak ada tugas mendekati deadline (≤3 hari) yang belum 100% dikerjakan mahasiswa.
+                                </p>
+                            </div>
+                        ) : (
+                            paginatedItems.map((task) => (
+                                <div
+                                    key={task.groupKey}
+                                    onClick={() => handleAdminAttentionClick(task)}
+                                    className="p-4 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group bg-amber-50/30 dark:bg-amber-950/10 border-amber-200 dark:border-amber-900/50 hover:border-amber-500"
+                                >
+                                    <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">
+                                        <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 shrink-0">
+                                            <AlertTriangle className="w-5 h-5" />
+                                        </div>
+
+                                        <div className="min-w-0 space-y-1 w-full">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300">
+                                                    Mendekati Deadline (Progress {task.progressPercent}%)
+                                                </span>
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    {task.matkul} • Pertemuan {task.pertemuan}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-amber-600 transition-colors">
+                                                {task.judul}
+                                            </h4>
+
+                                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                Masih ada <span className="font-bold text-rose-600">{task.totalStudents - task.doneCount} mahasiswa</span> yang belum menyelesaikan tugas ini.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>
+                                                {task.deadline
+                                                    ? (task.deadline.seconds
+                                                        ? new Date(task.deadline.seconds * 1000)
+                                                        : new Date(task.deadline)
+                                                    ).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })
+                                                    : "-"}
+                                            </span>
+                                        </div>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAdminAttentionClick(task);
+                                            }}
+                                            className="p-2 rounded-xl bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-sm"
+                                            title="Buka Managemen Task"
+                                        >
+                                            <ArrowRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
+
+                {/* MAHASISWA TAB 1: PENGINGAT DEADLINE */}
+                {!isAdmin && activeTab === "deadline" && (
+                    <>
+                        {paginatedItems.length === 0 ? (
                             <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-12 text-center space-y-3">
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
                                     <CheckCircle2 className="w-6 h-6" />
@@ -189,112 +378,100 @@ export default function NotificationPage() {
                                 </p>
                             </div>
                         ) : (
-                            reminders.map((notif) => {
-                                const isUnread = !readIds.includes(notif.id);
-                                return (
-                                    <div
-                                        key={notif.id}
-                                        onClick={() => handleReminderClick(notif)}
-                                        className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group ${isUnread
-                                            ? "bg-rose-50/30 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/50"
-                                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500"
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">
-                                            <div className="relative p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5 sm:mt-0">
-                                                <BookOpen className="w-5 h-5" />
-                                                {isUnread && (
-                                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
-                                                )}
-                                            </div>
-
-                                            <div className="min-w-0 space-y-1 w-full">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span
-                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${notif.type === "reminder_h1"
-                                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
-                                                            : notif.type === "reminder_h2"
-                                                                ? "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
-                                                                : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300"
-                                                            }`}
-                                                    >
-                                                        {notif.badge}
-                                                    </span>
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                        {notif.task?.matkul}
-                                                    </span>
-                                                </div>
-
-                                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                                    {notif.title}
-                                                </h4>
-
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
-                                                    {notif.message}
-                                                </p>
-                                            </div>
+                            paginatedItems.map((notif) => (
+                                <div
+                                    key={notif.id}
+                                    onClick={() => router.push(`/tasks?id=${notif.taskId}`)}
+                                    className="p-4 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500"
+                                >
+                                    <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">
+                                        <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0">
+                                            <BookOpen className="w-5 h-5" />
                                         </div>
 
-                                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                                                <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                                                <span>
-                                                    {notif.deadline
-                                                        ? notif.deadline.toLocaleString("id-ID", {
-                                                            dateStyle: "medium",
-                                                            timeStyle: "short",
-                                                        })
-                                                        : "Mendekati Deadline"}
+                                        <div className="min-w-0 space-y-1 w-full">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span
+                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${notif.type === "reminder_h1"
+                                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
+                                                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
+                                                        }`}
+                                                >
+                                                    {notif.badge}
+                                                </span>
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                    {notif.task?.matkul}
                                                 </span>
                                             </div>
 
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleReminderClick(notif);
-                                                }}
-                                                className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
-                                                title="Lihat Detail Tugas"
-                                            >
-                                                <ArrowRight className="w-4 h-4" />
-                                            </button>
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
+                                                {notif.title}
+                                            </h4>
+
+                                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                {notif.message}
+                                            </p>
                                         </div>
                                     </div>
-                                );
-                            })
+
+                                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                            <span>
+                                                {notif.deadline
+                                                    ? new Date(notif.deadline).toLocaleString("id-ID", {
+                                                        dateStyle: "medium",
+                                                        timeStyle: "short",
+                                                    })
+                                                    : "Mendekati Deadline"}
+                                            </span>
+                                        </div>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/tasks?id=${notif.taskId}`);
+                                            }}
+                                            className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                                        >
+                                            <ArrowRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
                         )}
                     </>
                 )}
 
-                {/* TAB 2: PENGUMUMAN ADMIN */}
-                {activeTab === "admin" && (
+                {/* MAHASISWA TAB 2: TUGAS BARU (NOTIFIKASI FIRESTORE) */}
+                {!isAdmin && activeTab === "new_tasks" && (
                     <>
-                        {adminAnnouncements.length === 0 ? (
+                        {paginatedItems.length === 0 ? (
                             <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-12 text-center space-y-3">
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
                                     <Info className="w-6 h-6" />
                                 </div>
                                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                                    Belum Ada Pengumuman Admin
+                                    Belum Ada Notifikasi Tugas Baru
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                                    Informasi penting atau pengumuman dari ketua kelas/admin akan tampil di sini.
+                                    Ketika Admin menambahkan tugas baru untuk kelas kamu, notifikasi akan otomatis muncul di sini.
                                 </p>
                             </div>
                         ) : (
-                            adminAnnouncements.map((item) => {
-                                const isUnread = !readIds.includes(item.id);
+                            paginatedItems.map((item) => {
+                                const isUnread = !item.read;
                                 return (
                                     <div
                                         key={item.id}
-                                        onClick={() => handleAdminClick(item)}
+                                        onClick={() => handleNotifClick(item)}
                                         className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group ${isUnread
-                                            ? "bg-rose-50/30 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/50"
-                                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500"
+                                                ? "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60"
+                                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500"
                                             }`}
                                     >
                                         <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">
-                                            <div className="relative p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5 sm:mt-0">
+                                            <div className="relative p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0">
                                                 <Megaphone className="w-5 h-5" />
                                                 {isUnread && (
                                                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
@@ -303,30 +480,35 @@ export default function NotificationPage() {
 
                                             <div className="min-w-0 space-y-1 w-full">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300">
-                                                        {item.category || "Pengumuman Kelas"}
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                                        {item.category || "Tugas Baru"}
                                                     </span>
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                        Oleh: {item.author || "Admin Kelas"}
-                                                    </span>
+                                                    {isUnread && (
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">
+                                                            BELUM DIBACA
+                                                        </span>
+                                                    )}
                                                 </div>
 
-                                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
                                                     {item.title}
                                                 </h4>
 
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
-                                                    {item.content || item.message}
+                                                <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                    {item.message}
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                                                <Clock className="w-3.5 h-3.5 text-purple-500" />
+                                                <Clock className="w-3.5 h-3.5 text-indigo-500" />
                                                 <span>
                                                     {item.createdAt
-                                                        ? new Date(item.createdAt).toLocaleDateString("id-ID", {
+                                                        ? (item.createdAt.seconds
+                                                            ? new Date(item.createdAt.seconds * 1000)
+                                                            : new Date(item.createdAt)
+                                                        ).toLocaleDateString("id-ID", {
                                                             day: "numeric",
                                                             month: "short",
                                                             year: "numeric",
@@ -338,10 +520,9 @@ export default function NotificationPage() {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleAdminClick(item);
+                                                    handleNotifClick(item);
                                                 }}
-                                                className="p-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-sm"
-                                                title="Lihat Detail"
+                                                className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
                                             >
                                                 <ArrowRight className="w-4 h-4" />
                                             </button>
@@ -352,7 +533,57 @@ export default function NotificationPage() {
                         )}
                     </>
                 )}
+
+                {/* ADMIN TAB 2: PENGUMUMAN KELAS */}
+                {isAdmin && activeTab === "admin_announcements" && (
+                    <>
+                        {paginatedItems.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl p-12 text-center space-y-3">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                                    <Info className="w-6 h-6" />
+                                </div>
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                    Belum Ada Pengumuman
+                                </p>
+                            </div>
+                        ) : (
+                            paginatedItems.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="p-4 rounded-2xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                                >
+                                    <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">
+                                        <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 shrink-0">
+                                            <Megaphone className="w-5 h-5" />
+                                        </div>
+
+                                        <div className="min-w-0 space-y-1 w-full">
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                                {item.title}
+                                            </h4>
+                                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                {item.content || item.message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
             </div>
+
+            {/* Pagination Controls */}
+            {filteredItems.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
+                    totalItems={filteredItems.length}
+                />
+            )}
         </div>
     );
 }

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getUserTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
+import { subscribeNotifications } from "@/services/notificationService";
 
 export default function TopNav({ isDarkMode, toggleDarkMode }) {
     const router = useRouter();
@@ -45,7 +46,7 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
     const notifRef = useRef(null);
     const searchRef = useRef(null);
 
-    // Load tasks for search & reminders
+    // Load tasks for search & subscribe realtime unread notifications
     useEffect(() => {
         if (!user?.uid) return;
 
@@ -53,15 +54,19 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
             try {
                 const tasks = await getUserTasks(user.uid);
                 setAllTasks(tasks || []);
-                const activeReminders = getUpcomingTaskReminders(tasks || []);
-                setNotifications(activeReminders);
-                setUnreadCount(activeReminders.length);
             } catch (err) {
                 console.error("Gagal memuat data di navigasi atas:", err);
             }
         };
 
         loadData();
+
+        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+            const unread = notifs.filter((n) => !n.read).length;
+            setUnreadCount(unread);
+        });
+
+        return () => unsubscribe();
     }, [user?.uid]);
 
     // Live search filter (YouTube-style suggestion dropdown)

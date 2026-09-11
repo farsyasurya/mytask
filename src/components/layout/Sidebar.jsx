@@ -19,8 +19,7 @@ import {
     PlusCircle,
     ClipboardList
 } from "lucide-react";
-import { getUserTasks } from "@/services/taskService";
-import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
+import { subscribeNotifications } from "@/services/notificationService";
 
 export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: externalToggleDarkMode }) {
     const pathname = usePathname();
@@ -43,33 +42,29 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
     useEffect(() => {
         if (!user?.uid) return;
 
-        const loadReminders = async () => {
-            try {
-                const tasks = await getUserTasks(user.uid);
-                const activeReminders = getUpcomingTaskReminders(tasks);
-                setUnreadCount(activeReminders.length);
-            } catch (err) {
-                console.error("Gagal memuat pengingat tugas di sidebar:", err);
-            }
-        };
+        // Realtime notification listener for unread count
+        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+            const unread = notifs.filter((n) => !n.read).length;
+            setUnreadCount(unread);
+        });
 
-        loadReminders();
+        return () => unsubscribe();
     }, [user?.uid]);
 
-    const navItems = [
-        { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-        { label: "Daftar Tugas", href: "/tasks", icon: CheckSquare },
-        { label: "Kalender", href: "/calendar", icon: Calendar },
-        { label: "Profil", href: "/profile", icon: User },
-        { label: "Notifikasi", href: "/notifications", icon: Bell }
+    // Role-based Navigation
+    const navItems = userData?.role === "ADMIN" ? [
+        { label: "Dashboard", shortLabel: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+        { label: "Tambah Tugas", shortLabel: "Tambah", href: "/task-admin", icon: PlusCircle },
+        { label: "Kelola Tugas", shortLabel: "Kelola", href: "/managemen-task", icon: ClipboardList },
+        { label: "Notifikasi", shortLabel: "Notif", href: "/notifications", icon: Bell },
+        { label: "Profil", shortLabel: "Profil", href: "/profile", icon: User }
+    ] : [
+        { label: "Beranda", shortLabel: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+        { label: "Daftar Tugas", shortLabel: "Tugas", href: "/tasks", icon: CheckSquare },
+        { label: "Kalender", shortLabel: "Kalender", href: "/calendar", icon: Calendar },
+        { label: "Notifikasi", shortLabel: "Notif", href: "/notifications", icon: Bell },
+        { label: "Profil", shortLabel: "Profil", href: "/profile", icon: User }
     ];
-
-    if (userData?.role === "ADMIN") {
-        navItems.splice(2, 0,
-            { label: "Tambah Task Admin", href: "/task-admin", icon: PlusCircle },
-            { label: "Managemen Task", href: "/managemen-task", icon: ClipboardList }
-        );
-    }
 
     const handleLogout = async () => {
         await logout();
@@ -125,7 +120,7 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                                 <span className="truncate">{userData?.id_user || userData?.email || user?.email}</span>
                                 <span className="font-mono text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-1 rounded">
-                                    {userData?.kelas || "01TPLE002"}
+                                    {userData?.kelas || ""}
                                 </span>
                             </div>
                         </div>
@@ -150,16 +145,18 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                             >
                                 <div className="relative shrink-0">
                                     <Icon className={`w-5 h-5 ${isActive ? "text-indigo-600 dark:text-indigo-400" : ""}`} />
-                                    {isCollapsed && item.label === "Notifikasi" && unreadCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-white dark:border-slate-900" />
+                                    {isCollapsed && item.href === "/notifications" && unreadCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-[9px] font-bold text-white border border-white dark:border-slate-900 animate-pulse">
+                                            {unreadCount > 9 ? "9+" : unreadCount}
+                                        </span>
                                     )}
                                 </div>
                                 {!isCollapsed && (
                                     <span className="whitespace-nowrap transition-opacity duration-300 flex-1 flex items-center justify-between">
                                         {item.label}
-                                        {item.label === "Notifikasi" && unreadCount > 0 && (
-                                            <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-red-600 text-xs font-medium text-white">
-                                                {unreadCount}
+                                        {item.href === "/notifications" && unreadCount > 0 && (
+                                            <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-rose-600 text-xs font-bold text-white shadow-sm">
+                                                {unreadCount > 9 ? "9+" : unreadCount}
                                             </span>
                                         )}
                                     </span>
@@ -224,7 +221,7 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
             </aside>
 
             {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-50 px-2 py-2 flex justify-around items-center">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-50 px-1 py-2 flex justify-around items-center">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href;
@@ -232,18 +229,18 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex flex-col items-center gap-1 text-[10px] font-medium py-1 px-3 rounded-lg transition-colors ${isActive
-                                    ? "text-indigo-600 dark:text-indigo-400 font-bold"
-                                    : "text-slate-500 dark:text-slate-400"
+                            className={`flex flex-col items-center gap-1 text-[10px] font-medium py-1 px-2.5 rounded-lg transition-colors ${isActive
+                                ? "text-indigo-600 dark:text-indigo-400 font-bold"
+                                : "text-slate-500 dark:text-slate-400"
                                 }`}
                         >
                             <div className="relative">
                                 <Icon className="w-5 h-5" />
-                                {item.label === "Notifikasi" && unreadCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-white dark:border-slate-900" />
+                                {item.href === "/notifications" && unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-600 border border-white dark:border-slate-900 animate-pulse" />
                                 )}
                             </div>
-                            {item.label}
+                            <span className="truncate max-w-[60px] text-center">{item.shortLabel || item.label}</span>
                         </Link>
                     );
                 })}

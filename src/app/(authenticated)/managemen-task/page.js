@@ -25,21 +25,38 @@ import {
     Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
+import Pagination from "@/components/common/Pagination";
+import MobileFilterDialog from "@/components/common/MobileFilterDialog";
 
 export default function ManagemenTaskPage() {
     const { userData, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "01TPLE002");
+    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "");
     const [filterMatkul, setFilterMatkul] = useState("");
     const [filterPertemuan, setFilterPertemuan] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Period Filter State
+    const [selectedPeriod, setSelectedPeriod] = useState("all");
+    const [customStartDate, setCustomStartDate] = useState("");
+    const [customEndDate, setCustomEndDate] = useState("");
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const [tasksData, setTasksData] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // State untuk Modal Rincian Status Mahasiswa pada Tugas Spesifik
     const [selectedTaskModal, setSelectedTaskModal] = useState(null);
+
+    // Reset page on filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [kelas, filterMatkul, filterPertemuan, searchQuery, selectedPeriod, customStartDate, customEndDate]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -66,8 +83,8 @@ export default function ManagemenTaskPage() {
         }
     }, [userData?.kelas]);
 
-    // Filtering tugas berdasarkan Mata Kuliah, Pertemuan, dan Search Judul
-    const filteredTasks = tasksData.filter((t) => {
+    // Filtering tugas berdasarkan Mata Kuliah, Pertemuan, Search Judul, dan Periode
+    const initialFiltered = tasksData.filter((t) => {
         if (filterMatkul && t.matkul !== filterMatkul) return false;
         if (filterPertemuan && parseInt(t.pertemuan, 10) !== parseInt(filterPertemuan, 10)) return false;
 
@@ -82,6 +99,10 @@ export default function ManagemenTaskPage() {
 
         return true;
     });
+
+    const filteredTasks = filterItemsByPeriod(initialFiltered, selectedPeriod, (t) => t.deadline, customStartDate, customEndDate);
+    const totalPages = Math.ceil(filteredTasks.length / pageSize) || 1;
+    const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const totalTasksCount = tasksData.length;
 
@@ -114,7 +135,7 @@ export default function ManagemenTaskPage() {
                 let statusLabel = "Belum dikerjakan (new)";
                 if (s.status === "on_progress") statusLabel = "Sedang dikerjakan (on progress)";
                 if (s.status === "reject") statusLabel = "Perlu perbaikan (reject)";
-                
+
                 const lastUpd = formatDateTime(s.updatedAt);
                 return `${idx + 1}. ${s.name} [Status: ${statusLabel} | Update: ${lastUpd}]`;
             }).join("\n")
@@ -189,64 +210,87 @@ export default function ManagemenTaskPage() {
                 </div>
             </div>
 
-            {/* Filter Bar */}
+            {/* Filter Bar with Mobile Dialog Wrapper */}
             <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Kelas Filter */}
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-indigo-500" /> Kelas Target
-                        </label>
-                        <select
-                            value={kelas}
-                            onChange={(e) => setKelas(e.target.value)}
-                            className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
-                        >
-                            {KELAS_OPTIONS.map((k) => (
-                                <option key={k} value={k} className="dark:bg-slate-900">
-                                    Kelas {k}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Filter & Pencarian Task
+                    </span>
+                    <MobileFilterDialog title="Filter" activeCount={(filterMatkul || filterPertemuan || selectedPeriod !== "all") ? 1 : 0}>
+                        <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Filter Periode Deadline:
+                                </span>
+                                <PeriodFilter
+                                    selectedPeriod={selectedPeriod}
+                                    onPeriodChange={setSelectedPeriod}
+                                    customStartDate={customStartDate}
+                                    customEndDate={customEndDate}
+                                    onStartDateChange={setCustomStartDate}
+                                    onEndDateChange={setCustomEndDate}
+                                />
+                            </div>
 
-                    {/* Matkul Filter */}
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
-                            <BookOpen className="w-3.5 h-3.5 text-indigo-500" /> Filter Mata Kuliah
-                        </label>
-                        <select
-                            value={filterMatkul}
-                            onChange={(e) => setFilterMatkul(e.target.value)}
-                            className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
-                        >
-                            <option value="" className="dark:bg-slate-900">Semua Mata Kuliah</option>
-                            {MATA_KULIAH.map((m) => (
-                                <option key={m} value={m} className="dark:bg-slate-900">
-                                    {m}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {/* Kelas Filter */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
+                                        <Users className="w-3.5 h-3.5 text-indigo-500" /> Kelas Target
+                                    </label>
+                                    <select
+                                        value={kelas}
+                                        onChange={(e) => setKelas(e.target.value)}
+                                        className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
+                                    >
+                                        {KELAS_OPTIONS.map((k) => (
+                                            <option key={k} value={k} className="dark:bg-slate-900">
+                                                Kelas {k}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                    {/* Pertemuan Filter */}
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
-                            <Layers className="w-3.5 h-3.5 text-indigo-500" /> Filter Pertemuan
-                        </label>
-                        <select
-                            value={filterPertemuan}
-                            onChange={(e) => setFilterPertemuan(e.target.value)}
-                            className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
-                        >
-                            <option value="" className="dark:bg-slate-900">Semua Pertemuan</option>
-                            {[...Array(14)].map((_, i) => (
-                                <option key={i + 1} value={i + 1} className="dark:bg-slate-900">
-                                    Pertemuan {i + 1}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                                {/* Matkul Filter */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
+                                        <BookOpen className="w-3.5 h-3.5 text-indigo-500" /> Filter Mata Kuliah
+                                    </label>
+                                    <select
+                                        value={filterMatkul}
+                                        onChange={(e) => setFilterMatkul(e.target.value)}
+                                        className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
+                                    >
+                                        <option value="" className="dark:bg-slate-900">Semua Mata Kuliah</option>
+                                        {MATA_KULIAH.map((m) => (
+                                            <option key={m} value={m} className="dark:bg-slate-900">
+                                                {m}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Pertemuan Filter */}
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1">
+                                        <Layers className="w-3.5 h-3.5 text-indigo-500" /> Filter Pertemuan
+                                    </label>
+                                    <select
+                                        value={filterPertemuan}
+                                        onChange={(e) => setFilterPertemuan(e.target.value)}
+                                        className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer font-medium"
+                                    >
+                                        <option value="" className="dark:bg-slate-900">Semua Pertemuan</option>
+                                        {[...Array(14)].map((_, i) => (
+                                            <option key={i + 1} value={i + 1} className="dark:bg-slate-900">
+                                                Pertemuan {i + 1}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </MobileFilterDialog>
                 </div>
 
                 {/* Search Bar */}
@@ -282,8 +326,9 @@ export default function ManagemenTaskPage() {
                     </button>
                 </div>
             ) : (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-4 space-y-4">
+                    {/* DESKTOP VIEW: Table */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -296,7 +341,7 @@ export default function ManagemenTaskPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
-                                {filteredTasks.map((taskGroup) => {
+                                {paginatedTasks.map((taskGroup) => {
                                     return (
                                         <tr key={taskGroup.groupKey} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                                             {/* Mata Kuliah & Judul Tugas */}
@@ -331,10 +376,10 @@ export default function ManagemenTaskPage() {
                                                         <div className="w-16 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shrink-0">
                                                             <div
                                                                 className={`h-full transition-all rounded-full ${taskGroup.progressPercent === 100
-                                                                        ? "bg-emerald-500"
-                                                                        : taskGroup.progressPercent > 0
-                                                                            ? "bg-amber-500"
-                                                                            : "bg-rose-500"
+                                                                    ? "bg-emerald-500"
+                                                                    : taskGroup.progressPercent > 0
+                                                                        ? "bg-amber-500"
+                                                                        : "bg-rose-500"
                                                                     }`}
                                                                 style={{ width: `${taskGroup.progressPercent}%` }}
                                                             />
@@ -379,6 +424,84 @@ export default function ManagemenTaskPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* MOBILE VIEW: Cards */}
+                    <div className="block md:hidden space-y-3">
+                        {paginatedTasks.map((taskGroup) => (
+                            <div
+                                key={taskGroup.groupKey}
+                                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-3"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300">
+                                                {taskGroup.matkul}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 font-mono">
+                                                Pertemuan {taskGroup.pertemuan}
+                                            </span>
+                                        </div>
+                                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                            {taskGroup.judul}
+                                        </h4>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setSelectedTaskModal(taskGroup)}
+                                        className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0"
+                                        title="Status Mahasiswa"
+                                    >
+                                        <UserCheck className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-slate-500">Deadline:</span>
+                                        <span className="text-rose-600 dark:text-rose-400 font-medium text-[11px]">
+                                            {formatDateTime(taskGroup.deadline)}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-slate-500">Progress Selesai:</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-14 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full ${taskGroup.progressPercent === 100 ? "bg-emerald-500" : "bg-amber-500"}`}
+                                                    style={{ width: `${taskGroup.progressPercent}%` }}
+                                                />
+                                            </div>
+                                            <span className="font-bold text-xs font-mono">{taskGroup.progressPercent}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                                    <span className="text-[10px] text-slate-400">
+                                        {taskGroup.doneCount} / {taskGroup.totalStudents} Mahasiswa
+                                    </span>
+                                    <button
+                                        onClick={() => handleShareWATask(taskGroup)}
+                                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs inline-flex items-center gap-1 shadow-sm"
+                                    >
+                                        <Share2 className="w-3.5 h-3.5" />
+                                        Share WA
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        pageSize={pageSize}
+                        onPageSizeChange={setPageSize}
+                        totalItems={filteredTasks.length}
+                    />
                 </div>
             )}
 

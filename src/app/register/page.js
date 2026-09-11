@@ -11,7 +11,7 @@ export default function RegisterPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "01TPLE002");
+    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(false);
