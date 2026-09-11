@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Clock, Calendar, ArrowRight, BookOpen } from "lucide-react";
+import { Bell, Clock, Calendar, ArrowRight, BookOpen, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
@@ -101,10 +101,10 @@ export default function NotificationPage() {
                                 <div className="min-w-0 space-y-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${notif.type === "reminder_h1"
-                                                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
-                                                : notif.type === "reminder_h2"
-                                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
-                                                    : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300"
+                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
+                                            : notif.type === "reminder_h2"
+                                                ? "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
+                                                : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300"
                                             }`}>
                                             {notif.badge}
                                         </span>

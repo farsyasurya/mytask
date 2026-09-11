@@ -275,6 +275,7 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
                             onClick={() => {
                                 setIsNotifOpen(!isNotifOpen);
                                 setIsProfileOpen(false);
+                                router.push('/notifications');
                             }}
                             className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
                             title="Notifikasi Pengingat"
@@ -287,7 +288,7 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
                             )}
                         </button>
 
-                        {/* Notification Popover */}
+                        {/* Notification Popover
                         {isNotifOpen && (
                             <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
@@ -348,7 +349,7 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
                                     </Link>
                                 </div>
                             </div>
-                        )}
+                        )} */}
                     </div>
 
                     {/* Profile Dropdown */}
