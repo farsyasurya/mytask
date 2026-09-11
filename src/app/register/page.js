@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
+import { KELAS_OPTIONS } from "@/constants/kelas";
 
 export default function RegisterPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [kelas, setKelas] = useState(KELAS_OPTIONS[0] || "01TPLE002");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -49,7 +51,7 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            await register(name, email, password);
+            await register(name, email, password, kelas);
             router.push("/dashboard");
         } catch (err) {
             setError("Gagal mendaftar. Pastikan email belum pernah terdaftar.");
@@ -172,6 +174,23 @@ export default function RegisterPage() {
                                 className="w-full text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2.5 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-600 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="nama@email.com"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                Kode Kelas
+                            </label>
+                            <select
+                                value={kelas}
+                                onChange={(e) => setKelas(e.target.value)}
+                                className="w-full text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2.5 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-600 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:outline-none transition-all cursor-pointer"
+                            >
+                                {KELAS_OPTIONS.map((k) => (
+                                    <option key={k} value={k} className="dark:bg-slate-900">
+                                        {k}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>

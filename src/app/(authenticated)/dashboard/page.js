@@ -105,16 +105,16 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-indigo-900">
-                        {userData?.displayName ? userData.displayName.charAt(0).toUpperCase() : "U"}
+                        {userData?.name ? userData.name.charAt(0).toUpperCase() : (user?.displayName ? user.displayName.charAt(0).toUpperCase() : "U")}
                     </div>
 
                     <div>
                         <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-                            Selamat datang, {userData?.displayName || user?.displayName || user?.email?.split("@")[0] || ""}
+                            Selamat datang, {userData?.name || user?.displayName || user?.email?.split("@")[0] || ""}
                             <Sparkles className="w-5 h-5 text-amber-500 fill-amber-500 shrink-0" />
                         </h1>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                            Ringkasan dan tenggat waktu tugas kuliahmu                    {userData}
+                            Ringkasan dan tenggat waktu tugas kuliahmu
                         </p>
                     </div>
                 </div>

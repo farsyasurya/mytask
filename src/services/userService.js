@@ -6,6 +6,7 @@ import {
     updateDoc,
     collection,
     query,
+    where,
     orderBy,
     limit,
     getDocs,
@@ -34,7 +35,7 @@ export async function generateCustomUserId() {
     });
 }
 
-export async function createUserProfile(uid, name, email) {
+export async function createUserProfile(uid, name, email, kelas = "01TPLE002", role = "USER") {
     const userRef = doc(db, "users", uid);
     const userSnap = await getDoc(userRef);
 
@@ -45,6 +46,8 @@ export async function createUserProfile(uid, name, email) {
             id_user: customId,
             name: name,
             email: email,
+            kelas: kelas || "01TPLE002",
+            role: role || "USER",
             telegram: {
                 connected: false,
                 chat_id: null,
@@ -57,16 +60,38 @@ export async function createUserProfile(uid, name, email) {
         await setDoc(userRef, userData);
         return userData;
     }
-    return userSnap.data();
+    const data = userSnap.data();
+    // Default fallback values for legacy accounts without kelas / role
+    return {
+        ...data,
+        kelas: data.kelas || "01TPLE002",
+        role: data.role || "USER"
+    };
 }
 
 export async function getUserProfile(uid) {
     const userRef = doc(db, "users", uid);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists()) {
-        console.log(userSnap.data())
-        return userSnap.data();
-
+        const data = userSnap.data();
+        return {
+            ...data,
+            kelas: data.kelas || "01TPLE002",
+            role: data.role || "USER"
+        };
     }
     return null;
+}
+
+export async function getUsersByKelas(kelasCode = "01TPLE002") {
+    const q = query(
+        collection(db, "users"),
+        where("kelas", "==", kelasCode)
+    );
+    const querySnapshot = await getDocs(q);
+    const users = [];
+    querySnapshot.forEach((docSnap) => {
+        users.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return users;
 }

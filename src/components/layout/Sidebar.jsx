@@ -15,7 +15,9 @@ import {
     ChevronRight,
     Sun,
     Moon,
-    Bell
+    Bell,
+    PlusCircle,
+    ClipboardList
 } from "lucide-react";
 import { getUserTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
@@ -62,6 +64,13 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
         { label: "Notifikasi", href: "/notifications", icon: Bell }
     ];
 
+    if (userData?.role === "ADMIN") {
+        navItems.splice(2, 0,
+            { label: "Tambah Task Admin", href: "/task-admin", icon: PlusCircle },
+            { label: "Managemen Task", href: "/managemen-task", icon: ClipboardList }
+        );
+    }
+
     const handleLogout = async () => {
         await logout();
         router.push("/login");
@@ -106,9 +115,19 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                             {userInitial}
                         </div>
                     ) : (
-                        <div className="overflow-hidden">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{displayName}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userData?.id_user || userData?.email || user?.email}</p>
+                        <div className="overflow-hidden space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{displayName}</p>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${userData?.role === "ADMIN" ? "bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-800" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"}`}>
+                                    {userData?.role || "USER"}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                <span className="truncate">{userData?.id_user || userData?.email || user?.email}</span>
+                                <span className="font-mono text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-1 rounded">
+                                    {userData?.kelas || "01TPLE002"}
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>

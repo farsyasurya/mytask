@@ -197,16 +197,18 @@ function TasksContent() {
                         Kelola dan pantau seluruh tugas kuliahmu
                     </p>
                 </div>
-                <button
-                    onClick={() => {
-                        setTaskToEdit(null);
-                        setIsModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-500/20"
-                >
-                    <Plus className="w-4 h-4" />
-                    Tambah Task
-                </button>
+                {userData?.role === "ADMIN" && (
+                    <button
+                        onClick={() => {
+                            setTaskToEdit(null);
+                            setIsModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-500/20"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Tambah Task
+                    </button>
+                )}
             </div>
 
             {/* Filter Controls Bar */}
@@ -265,16 +267,18 @@ function TasksContent() {
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4">
                         Belum ada task yang sesuai dengan kriteria filter.
                     </p>
-                    <button
-                        onClick={() => {
-                            setTaskToEdit(null);
-                            setIsModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-semibold rounded-xl text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Tambah Task Pertama
-                    </button>
+                    {userData?.role === "ADMIN" && (
+                        <button
+                            onClick={() => {
+                                setTaskToEdit(null);
+                                setIsModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-semibold rounded-xl text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Tambah Task Pertama
+                        </button>
+                    )}
                 </motion.div>
             ) : (
                 <motion.div
