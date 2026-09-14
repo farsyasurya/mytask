@@ -2,8 +2,12 @@
 
 import { TASK_STATUS } from "@/constants/taskStatus";
 import { TASK_TYPES } from "@/constants/taskTypes";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onDetail }) {
+    const { userData } = useAuth();
+    const isAdmin = userData?.role === "ADMIN";
+
     const isDone = task.status === "done";
     const deadlineDate = task.deadline?.seconds
         ? new Date(task.deadline.seconds * 1000)
@@ -75,7 +79,7 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onDet
                 </div>
 
                 <h3
-                    onClick={() => onDetail(task)}
+                    onClick={() => onDetail && onDetail(task)}
                     className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer line-clamp-2 transition-colors"
                 >
                     {task.judul}
@@ -105,31 +109,41 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onDet
                     )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <select
-                        value={task.status}
-                        onChange={(e) => onStatusChange(task.id, e.target.value)}
-                        className="text-xs border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                    >
-                        <option value="new" className="dark:bg-slate-900">New</option>
-                        <option value="on_progress" className="dark:bg-slate-900">On Progress</option>
-                        <option value="reject" className="dark:bg-slate-900">Reject</option>
-                        <option value="done" className="dark:bg-slate-900">Done</option>
-                    </select>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-1">
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Status:</span>
+                        <select
+                            value={task.status}
+                            onChange={(e) => onStatusChange && onStatusChange(task.id, e.target.value)}
+                            className="text-xs font-semibold border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-all"
+                        >
+                            <option value="new" className="dark:bg-slate-900">New</option>
+                            <option value="on_progress" className="dark:bg-slate-900">On Progress</option>
+                            <option value="reject" className="dark:bg-slate-900">Reject</option>
+                            <option value="done" className="dark:bg-slate-900">Done</option>
+                        </select>
+                    </div>
 
-                    <button
-                        onClick={() => onEdit(task)}
-                        className="text-xs px-2.5 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                    >
-                        Edit
-                    </button>
-
-                    <button
-                        onClick={() => onDelete(task.id)}
-                        className="text-xs px-2.5 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors ml-auto"
-                    >
-                        Hapus
-                    </button>
+                    {isAdmin && (
+                        <div className="flex items-center gap-1">
+                            {onEdit && (
+                                <button
+                                    onClick={() => onEdit(task)}
+                                    className="text-xs font-medium px-2.5 py-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-colors"
+                                >
+                                    Edit
+                                </button>
+                            )}
+                            {onDelete && (
+                                <button
+                                    onClick={() => onDelete(task.id)}
+                                    className="text-xs font-medium px-2.5 py-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                                >
+                                    Hapus
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -6,7 +6,7 @@ import { Bell, Clock, ArrowRight, BookOpen, CheckCircle2, Megaphone, Info, Alert
 import { useAuth } from "@/hooks/useAuth";
 import { getUserTasks, getAdminManagementTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
-import { subscribeNotifications, markAsRead } from "@/services/notificationService";
+import { subscribeNotifications, markAsRead, cleanupAdminNotifications } from "@/services/notificationService";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
@@ -62,7 +62,7 @@ export default function NotificationPage() {
                 setReminders(activeReminders);
             } catch (err) {
                 console.error("Gagal mengambil data pengingat:", err);
-            } flex: {
+            } finally {
                 setLoading(false);
             }
         };
@@ -76,7 +76,9 @@ export default function NotificationPage() {
 
     // 2. Admin Attention Tasks (Tasks with deadline approaching and progress < 100%)
     useEffect(() => {
-        if (!isAdmin || !userData?.kelas) return;
+        if (!isAdmin || !userData?.kelas || !user?.uid) return;
+
+        cleanupAdminNotifications(user.uid);
 
         const loadAdminAttention = async () => {
             try {
@@ -101,7 +103,7 @@ export default function NotificationPage() {
         };
 
         loadAdminAttention();
-    }, [isAdmin, userData?.kelas]);
+    }, [isAdmin, userData?.kelas, user?.uid]);
 
     // 3. Realtime listener announcements
     useEffect(() => {
@@ -133,8 +135,9 @@ export default function NotificationPage() {
         if (notif.id && !notif.read) {
             await markAsRead(notif.id);
         }
-        if (notif.broadcast_id || notif.taskId) {
-            router.push(`/tasks?id=${notif.broadcast_id || notif.taskId}`);
+        const targetId = notif.taskId || notif.task_id || notif.broadcast_id;
+        if (targetId) {
+            router.push(`/tasks?id=${targetId}`);
         } else {
             router.push("/tasks");
         }
@@ -222,8 +225,8 @@ export default function NotificationPage() {
                         <button
                             onClick={() => setActiveTab("admin_attention")}
                             className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "admin_attention"
-                                    ? "border-amber-600 text-amber-600 dark:text-amber-400"
-                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "border-amber-600 text-amber-600 dark:text-amber-400"
+                                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                                 }`}
                         >
                             <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -238,8 +241,8 @@ export default function NotificationPage() {
                         <button
                             onClick={() => setActiveTab("admin_announcements")}
                             className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "admin_announcements"
-                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                                 }`}
                         >
                             <Megaphone className="w-4 h-4" />
@@ -251,8 +254,8 @@ export default function NotificationPage() {
                         <button
                             onClick={() => setActiveTab("deadline")}
                             className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "deadline"
-                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                                 }`}
                         >
                             <BookOpen className="w-4 h-4" />
@@ -267,8 +270,8 @@ export default function NotificationPage() {
                         <button
                             onClick={() => setActiveTab("new_tasks")}
                             className={`relative py-3 px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${activeTab === "new_tasks"
-                                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                                 }`}
                         >
                             <Megaphone className="w-4 h-4" />
@@ -393,8 +396,8 @@ export default function NotificationPage() {
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span
                                                     className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${notif.type === "reminder_h1"
-                                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
-                                                            : "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
+                                                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300"
+                                                        : "bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300"
                                                         }`}
                                                 >
                                                     {notif.badge}
@@ -463,11 +466,11 @@ export default function NotificationPage() {
                                 const isUnread = !item.read;
                                 return (
                                     <div
-                                        key={item.id}
+                                        key={item.id || item.taskId}
                                         onClick={() => handleNotifClick(item)}
                                         className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group ${isUnread
-                                                ? "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60"
-                                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500"
+                                            ? "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60"
+                                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-500"
                                             }`}
                                     >
                                         <div className="flex items-start gap-3.5 min-w-0 w-full sm:w-auto">

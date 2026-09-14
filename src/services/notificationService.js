@@ -4,6 +4,7 @@ import {
     query,
     where,
     updateDoc,
+    deleteDoc,
     doc,
     setDoc,
     getDocs,
@@ -44,12 +45,15 @@ export const subscribeNotifications = (userId, callback) => {
 };
 
 // Kirim dokumen notifikasi tugas baru dari Admin ke tiap mahasiswa di kelas
-export const createStudentTaskNotifications = async (targetUsers, taskData, broadcastId) => {
+export const createStudentTaskNotifications = async (createdTasks, taskData, broadcastId) => {
     try {
-        for (const u of targetUsers) {
+        for (const taskItem of createdTasks) {
+            if (taskItem.role === "ADMIN") continue;
             const notifRef = doc(collection(db, "notifications"));
             await setDoc(notifRef, {
-                userId: u.uid || u.id,
+                userId: taskItem.uid || taskItem.user_id,
+                taskId: taskItem.id,
+                task_id: taskItem.task_id || null,
                 type: "new_task",
                 category: "Tugas Baru",
                 title: `📌 Tugas Baru: ${taskData.judul}`,
@@ -66,6 +70,50 @@ export const createStudentTaskNotifications = async (targetUsers, taskData, broa
     }
 };
 
+// Hapus seluruh dokumen notifikasi yang terkait dengan broadcast_id atau groupKey tertentu
+export const deleteNotificationsByBroadcastId = async (broadcastId, groupKey = "") => {
+    try {
+        const qNotifs = collection(db, "notifications");
+        const snap = await getDocs(qNotifs);
+        const deletePromises = [];
+        snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            const matchBroadcast = broadcastId && data.broadcast_id === broadcastId;
+            let matchKey = false;
+            if (groupKey && data.matkul && data.pertemuan) {
+                if (groupKey.includes(data.matkul) && groupKey.includes(String(data.pertemuan))) {
+                    matchKey = true;
+                }
+            }
+            if (matchBroadcast || matchKey) {
+                deletePromises.push(deleteDoc(doc(db, "notifications", docSnap.id)));
+            }
+        });
+        await Promise.all(deletePromises);
+    } catch (err) {
+        console.error("Gagal menghapus notifikasi tugas broadcast:", err);
+    }
+};
+
+// Hapus dokumen notifikasi spesifik berdasarkan taskId
+export const deleteNotificationsByTaskId = async (taskId) => {
+    if (!taskId) return;
+    try {
+        const qNotifs = query(
+            collection(db, "notifications"),
+            where("taskId", "==", taskId)
+        );
+        const snap = await getDocs(qNotifs);
+        const deletePromises = [];
+        snap.forEach((docSnap) => {
+            deletePromises.push(deleteDoc(doc(db, "notifications", docSnap.id)));
+        });
+        await Promise.all(deletePromises);
+    } catch (err) {
+        console.error("Gagal menghapus notifikasi taskId:", err);
+    }
+};
+
 // Tandai notifikasi sebagai dibaca di Firestore
 export const markAsRead = async (notifId) => {
     try {
@@ -73,5 +121,24 @@ export const markAsRead = async (notifId) => {
         await updateDoc(ref, { read: true });
     } catch (err) {
         console.error("Gagal update status dibaca notifikasi:", err);
+    }
+};
+
+// Membersihkan notifikasi mahasiswa jika terbuat untuk akun Admin
+export const cleanupAdminNotifications = async (adminUid) => {
+    if (!adminUid) return;
+    try {
+        const qNotifs = query(
+            collection(db, "notifications"),
+            where("userId", "==", adminUid)
+        );
+        const snap = await getDocs(qNotifs);
+        const deletePromises = [];
+        snap.forEach((d) => {
+            deletePromises.push(deleteDoc(doc(db, "notifications", d.id)));
+        });
+        await Promise.all(deletePromises);
+    } catch (err) {
+        console.error("Gagal membersihkan notifikasi admin:", err);
     }
 };

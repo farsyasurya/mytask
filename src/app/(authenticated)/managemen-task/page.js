@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MATA_KULIAH } from "@/constants/mataKuliah";
 import { KELAS_OPTIONS } from "@/constants/kelas";
-import { getAdminManagementTasks } from "@/services/taskService";
+import {
+    getAdminManagementTasks,
+    updateAdminTaskGroup,
+    deleteAdminTaskGroup
+} from "@/services/taskService";
+import TaskModal from "@/components/task/TaskModal";
 import {
     ClipboardList,
     CheckCircle2,
@@ -22,7 +27,9 @@ import {
     X,
     Calendar,
     FileText,
-    Sparkles
+    Sparkles,
+    Edit3,
+    Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
@@ -52,6 +59,53 @@ export default function ManagemenTaskPage() {
 
     // State untuk Modal Rincian Status Mahasiswa pada Tugas Spesifik
     const [selectedTaskModal, setSelectedTaskModal] = useState(null);
+
+    // State untuk Modal Edit Tugas Admin
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [taskToEdit, setTaskToEdit] = useState(null);
+
+    const handleEditTaskGroup = (taskGroup) => {
+        setTaskToEdit({
+            ...taskGroup,
+            id: taskGroup.groupKey
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEditedTaskGroup = async (formData) => {
+        if (!taskToEdit) return;
+        try {
+            await updateAdminTaskGroup(
+                taskToEdit.groupKey,
+                taskToEdit.broadcast_id,
+                taskToEdit.kelas || kelas,
+                formData
+            );
+            setIsEditModalOpen(false);
+            setTaskToEdit(null);
+            await fetchData();
+        } catch (err) {
+            console.error("Gagal memperbarui tugas:", err);
+            alert("Gagal memperbarui tugas: " + (err.message || err));
+        }
+    };
+
+    const handleDeleteTaskGroup = async (taskGroup) => {
+        const confirmMsg = `Hapus tugas "${taskGroup.judul}"?\n\nTugas ini beserta seluruh data pengerjaan mahasiswa kelas ${taskGroup.kelas || kelas} akan dihapus secara permanen.`;
+        if (window.confirm(confirmMsg)) {
+            try {
+                await deleteAdminTaskGroup(
+                    taskGroup.groupKey,
+                    taskGroup.broadcast_id,
+                    taskGroup.kelas || kelas
+                );
+                await fetchData();
+            } catch (err) {
+                console.error("Gagal menghapus tugas:", err);
+                alert("Gagal menghapus tugas: " + (err.message || err));
+            }
+        }
+    };
 
     // Reset page on filter changes
     useEffect(() => {
@@ -394,17 +448,37 @@ export default function ManagemenTaskPage() {
                                                 </div>
                                             </td>
 
-                                            {/* Aksi: Icon User Button + Tombol WA */}
+                                            {/* Aksi: User Check, Edit, Delete, Share WA */}
                                             <td className="py-3.5 px-4 text-right">
-                                                <div className="inline-flex items-center gap-2 justify-end">
+                                                <div className="inline-flex items-center gap-1.5 justify-end">
                                                     {/* Icon User Button */}
                                                     <button
                                                         onClick={() => setSelectedTaskModal(taskGroup)}
-                                                        className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 transition-all active:scale-95 shadow-sm inline-flex items-center gap-1.5 text-xs font-semibold"
+                                                        className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 transition-all active:scale-95 shadow-sm inline-flex items-center gap-1 text-xs font-semibold"
                                                         title="Lihat Status Pengerjaan Mahasiswa"
                                                     >
                                                         <UserCheck className="w-4 h-4" />
-                                                        <span className="hidden md:inline">Status Mahasiswa</span>
+                                                        <span className="hidden lg:inline">Status</span>
+                                                    </button>
+
+                                                    {/* Tombol Edit */}
+                                                    <button
+                                                        onClick={() => handleEditTaskGroup(taskGroup)}
+                                                        className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-600 dark:text-amber-400 transition-all active:scale-95 shadow-sm inline-flex items-center gap-1 text-xs font-semibold"
+                                                        title="Edit Tugas Ini"
+                                                    >
+                                                        <Edit3 className="w-4 h-4" />
+                                                        <span className="hidden lg:inline">Edit</span>
+                                                    </button>
+
+                                                    {/* Tombol Hapus */}
+                                                    <button
+                                                        onClick={() => handleDeleteTaskGroup(taskGroup)}
+                                                        className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 transition-all active:scale-95 shadow-sm inline-flex items-center gap-1 text-xs font-semibold"
+                                                        title="Hapus Tugas Ini"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                        <span className="hidden lg:inline">Hapus</span>
                                                     </button>
 
                                                     {/* Tombol WA khusus Tugas Ini */}
@@ -414,7 +488,7 @@ export default function ManagemenTaskPage() {
                                                         title="Bagikan Rekap Tugas ke WhatsApp Group"
                                                     >
                                                         <Share2 className="w-4 h-4" />
-                                                        <span className="hidden md:inline">Share WA</span>
+                                                        <span className="hidden lg:inline">Share WA</span>
                                                     </button>
                                                 </div>
                                             </td>
@@ -447,13 +521,29 @@ export default function ManagemenTaskPage() {
                                         </h4>
                                     </div>
 
-                                    <button
-                                        onClick={() => setSelectedTaskModal(taskGroup)}
-                                        className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0"
-                                        title="Status Mahasiswa"
-                                    >
-                                        <UserCheck className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => setSelectedTaskModal(taskGroup)}
+                                            className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400"
+                                            title="Status Mahasiswa"
+                                        >
+                                            <UserCheck className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleEditTaskGroup(taskGroup)}
+                                            className="p-1.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400"
+                                            title="Edit Tugas"
+                                        >
+                                            <Edit3 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteTaskGroup(taskGroup)}
+                                            className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400"
+                                            title="Hapus Tugas"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
@@ -585,7 +675,7 @@ export default function ManagemenTaskPage() {
                                                     {st.name}
                                                 </p>
                                                 <p className="text-[10px] text-slate-400 font-mono truncate">
-                                                    {st.id_user} • {st.email}
+                                                    {st.nim}
                                                 </p>
                                             </div>
 
@@ -649,6 +739,13 @@ export default function ManagemenTaskPage() {
                     </div>
                 )}
             </AnimatePresence>
+            {/* Task Modal Edit untuk Admin */}
+            <TaskModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                onSave={handleSaveEditedTaskGroup}
+                taskToEdit={taskToEdit}
+            />
         </div>
     );
 }

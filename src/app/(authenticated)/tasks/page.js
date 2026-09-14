@@ -104,7 +104,7 @@ function TasksContent() {
         let result = [...tasks];
 
         if (taskIdParam) {
-            result = result.filter((t) => t.id === taskIdParam);
+            result = result.filter((t) => t.id === taskIdParam || t.broadcast_id === taskIdParam || t.task_id === taskIdParam);
         } else {
             if (search.trim()) {
                 result = result.filter((t) =>

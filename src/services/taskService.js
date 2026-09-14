@@ -15,7 +15,11 @@ import {
     runTransaction
 } from "firebase/firestore";
 import { checkAndUpdateTaskReminders } from "@/services/reminderCheckService";
-import { createStudentTaskNotifications } from "@/services/notificationService";
+import {
+    createStudentTaskNotifications,
+    deleteNotificationsByBroadcastId,
+    deleteNotificationsByTaskId
+} from "@/services/notificationService";
 
 /**
  * Generates sequential task ID (TASK-000001 format)
@@ -138,6 +142,11 @@ export async function updateTaskStatus(docId, newStatus) {
 export async function deleteTask(docId) {
     const taskRef = doc(db, "tasks", docId);
     await deleteDoc(taskRef);
+    try {
+        await deleteNotificationsByTaskId(docId);
+    } catch (e) {
+        console.error("Error deleting notification for task:", e);
+    }
 }
 
 /**
@@ -151,10 +160,13 @@ export async function createAdminTaskForClass(selectedKelas, taskData) {
             where("kelas", "==", selectedKelas)
         );
         const usersSnapshot = await getDocs(qUsers);
-        
+
         const targetUsers = [];
         usersSnapshot.forEach((docSnap) => {
-            targetUsers.push({ id: docSnap.id, ...docSnap.data() });
+            const uData = docSnap.data();
+            if (uData.role !== "ADMIN") {
+                targetUsers.push({ id: docSnap.id, ...uData });
+            }
         });
 
         if (targetUsers.length === 0) {
@@ -216,7 +228,7 @@ export async function createAdminTaskForClass(selectedKelas, taskData) {
 
         // Trigger notification creation for all target students in the background
         try {
-            await createStudentTaskNotifications(targetUsers, taskData, broadcastId);
+            await createStudentTaskNotifications(createdTasks, taskData, broadcastId);
         } catch (errNotif) {
             console.error("Gagal mengirimkan notifikasi ke mahasiswa:", errNotif);
         }
@@ -267,7 +279,7 @@ export async function getAdminManagementTasks(selectedKelas = "01TPLE002") {
 
     tasksSnap.forEach((docSnap) => {
         const tData = { id: docSnap.id, ...docSnap.data() };
-        
+
         // Group key: broadcast_id if present, else composite key (matkul + pertemuan + judul)
         const groupKey = tData.broadcast_id || `${tData.matkul || ""}_${tData.pertemuan || 1}_${tData.judul || ""}`;
 
@@ -296,6 +308,7 @@ export async function getAdminManagementTasks(selectedKelas = "01TPLE002") {
                 taskDocId: docSnap.id,
                 name: studentObj.name || studentObj.email?.split("@")[0] || "Mahasiswa",
                 email: studentObj.email,
+                nim: studentObj.nim || "-",
                 id_user: studentObj.id_user || "-",
                 status: tData.status || "new",
                 updatedAt: tData.updatedAt
@@ -409,4 +422,67 @@ export async function getClassTaskManagementData(selectedKelas = "01TPLE002", ma
     });
 
     return studentStatusList;
+}
+
+/**
+ * Updates all student task documents associated with a specific broadcast_id or groupKey
+ */
+export async function updateAdminTaskGroup(groupKey, broadcastId, selectedKelas, taskData) {
+    const qTasks = query(
+        collection(db, "tasks"),
+        where("kelas", "==", selectedKelas)
+    );
+    const tasksSnap = await getDocs(qTasks);
+
+    const deadlineTimestamp = Timestamp.fromDate(new Date(taskData.deadline));
+    const updatePayload = {
+        judul: taskData.judul,
+        deskripsi: taskData.deskripsi || "",
+        matkul: taskData.matkul,
+        pertemuan: parseInt(taskData.pertemuan, 10),
+        jenis_tugas: taskData.jenis_tugas || [],
+        jenis_tugas_lainnya: (taskData.jenis_tugas || []).includes("lainnya") ? (taskData.jenis_tugas_lainnya || null) : null,
+        deadline: deadlineTimestamp,
+        updatedAt: serverTimestamp()
+    };
+
+    const updatePromises = [];
+    tasksSnap.forEach((docSnap) => {
+        const tData = docSnap.data();
+        const docGroupKey = tData.broadcast_id || `${tData.matkul || ""}_${tData.pertemuan || 1}_${tData.judul || ""}`;
+        if (tData.broadcast_id === broadcastId || docGroupKey === groupKey) {
+            updatePromises.push(updateDoc(doc(db, "tasks", docSnap.id), updatePayload));
+        }
+    });
+
+    await Promise.all(updatePromises);
+}
+
+/**
+ * Deletes all student task documents associated with a specific broadcast_id or groupKey
+ */
+export async function deleteAdminTaskGroup(groupKey, broadcastId, selectedKelas) {
+    const qTasks = query(
+        collection(db, "tasks"),
+        where("kelas", "==", selectedKelas)
+    );
+    const tasksSnap = await getDocs(qTasks);
+
+    const deletePromises = [];
+    tasksSnap.forEach((docSnap) => {
+        const tData = docSnap.data();
+        const docGroupKey = tData.broadcast_id || `${tData.matkul || ""}_${tData.pertemuan || 1}_${tData.judul || ""}`;
+        if (tData.broadcast_id === broadcastId || docGroupKey === groupKey) {
+            deletePromises.push(deleteDoc(doc(db, "tasks", docSnap.id)));
+        }
+    });
+
+    await Promise.all(deletePromises);
+
+    // Hapus juga seluruh notifikasi tugas ini dari koleksi notifications di Firestore
+    try {
+        await deleteNotificationsByBroadcastId(broadcastId, groupKey);
+    } catch (errNotif) {
+        console.error("Gagal menghapus notifikasi terkait tugas:", errNotif);
+    }
 }

@@ -19,7 +19,8 @@ import {
     PlusCircle,
     ClipboardList
 } from "lucide-react";
-import { subscribeNotifications } from "@/services/notificationService";
+import { subscribeNotifications, cleanupAdminNotifications } from "@/services/notificationService";
+import { getAdminManagementTasks } from "@/services/taskService";
 
 export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: externalToggleDarkMode }) {
     const pathname = usePathname();
@@ -42,14 +43,36 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
     useEffect(() => {
         if (!user?.uid) return;
 
-        // Realtime notification listener for unread count
-        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
-            const unread = notifs.filter((n) => !n.read).length;
-            setUnreadCount(unread);
-        });
+        if (userData?.role === "ADMIN") {
+            cleanupAdminNotifications(user.uid);
 
-        return () => unsubscribe();
-    }, [user?.uid]);
+            const loadAdminAttention = async () => {
+                try {
+                    const classTasks = await getAdminManagementTasks(userData.kelas);
+                    const now = new Date();
+                    const threeDays = 3 * 24 * 60 * 60 * 1000;
+                    const attentionList = (classTasks || []).filter((t) => {
+                        if (t.progressPercent >= 100) return false;
+                        const d = t.deadline?.seconds ? new Date(t.deadline.seconds * 1000) : new Date(t.deadline);
+                        const diff = d - now;
+                        return diff > 0 && diff <= threeDays;
+                    });
+                    setUnreadCount(attentionList.length);
+                } catch (err) {
+                    console.error("Gagal memuat count perhatian admin:", err);
+                }
+            };
+            loadAdminAttention();
+        } else {
+            // Realtime notification listener for unread count
+            const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+                const unread = notifs.filter((n) => !n.read).length;
+                setUnreadCount(unread);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [user?.uid, userData?.role, userData?.kelas]);
 
     // Role-based Navigation
     const navItems = userData?.role === "ADMIN" ? [
@@ -120,7 +143,7 @@ export default function Sidebar({ isDarkMode: externalDarkMode, toggleDarkMode: 
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span className="truncate">{userData?.id_user || userData?.email || user?.email}</span>
+                                <span className="truncate">{userData?.nim || userData?.id_user || user?.email}</span>
                                 <span className="font-mono text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-1 rounded">
                                     {userData?.kelas || ""}
                                 </span>

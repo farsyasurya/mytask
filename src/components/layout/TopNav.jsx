@@ -19,9 +19,9 @@ import {
     CheckCircle2,
     BookOpen
 } from "lucide-react";
-import { getUserTasks } from "@/services/taskService";
+import { getUserTasks, getAdminManagementTasks } from "@/services/taskService";
 import { getUpcomingTaskReminders } from "@/services/reminderCheckService";
-import { subscribeNotifications } from "@/services/notificationService";
+import { subscribeNotifications, cleanupAdminNotifications } from "@/services/notificationService";
 
 export default function TopNav({ isDarkMode, toggleDarkMode }) {
     const router = useRouter();
@@ -61,13 +61,35 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
 
         loadData();
 
-        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
-            const unread = notifs.filter((n) => !n.read).length;
-            setUnreadCount(unread);
-        });
+        if (userData?.role === "ADMIN") {
+            cleanupAdminNotifications(user.uid);
 
-        return () => unsubscribe();
-    }, [user?.uid]);
+            const loadAdminAttention = async () => {
+                try {
+                    const classTasks = await getAdminManagementTasks(userData.kelas);
+                    const now = new Date();
+                    const threeDays = 3 * 24 * 60 * 60 * 1000;
+                    const attentionList = (classTasks || []).filter((t) => {
+                        if (t.progressPercent >= 100) return false;
+                        const d = t.deadline?.seconds ? new Date(t.deadline.seconds * 1000) : new Date(t.deadline);
+                        const diff = d - now;
+                        return diff > 0 && diff <= threeDays;
+                    });
+                    setUnreadCount(attentionList.length);
+                } catch (err) {
+                    console.error("Gagal memuat count perhatian admin:", err);
+                }
+            };
+            loadAdminAttention();
+        } else {
+            const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+                const unread = notifs.filter((n) => !n.read).length;
+                setUnreadCount(unread);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [user?.uid, userData?.role, userData?.kelas]);
 
     // Live search filter (YouTube-style suggestion dropdown)
     useEffect(() => {
@@ -119,8 +141,9 @@ export default function TopNav({ isDarkMode, toggleDarkMode }) {
 
     const handleNotificationClick = (notif) => {
         setIsNotifOpen(false);
-        if (notif.taskId) {
-            router.push(`/tasks?id=${notif.taskId}`);
+        const targetId = notif.taskId || notif.task_id || notif.broadcast_id;
+        if (targetId) {
+            router.push(`/tasks?id=${targetId}`);
         } else {
             router.push("/tasks");
         }
