@@ -36,6 +36,7 @@ export default function ProfilePage() {
     const [telegramConn, setTelegramConn] = useState(null);
     const [connectingTelegram, setConnectingTelegram] = useState(false);
     const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
+    const [generatedTelegramUrl, setGeneratedTelegramUrl] = useState("");
 
     // Listener realtime status Telegram user
     useEffect(() => {
@@ -53,8 +54,13 @@ export default function ProfilePage() {
         setSuccessMessage("");
         try {
             const { telegramLink } = await createTelegramLinkToken(user.uid, profile?.id_user || user.uid);
-            window.open(telegramLink, "_blank");
-            setSuccessMessage("Link Telegram telah dibuat! Silakan buka Telegram dan tekan tombol Start / Mulai.");
+            setGeneratedTelegramUrl(telegramLink);
+            setSuccessMessage("Link Telegram berhasil dibuat! Mengalihkan ke Telegram...");
+
+            // Trigger direct redirection (works reliably on mobile apps, Safari, Chrome, and PWA)
+            setTimeout(() => {
+                window.location.href = telegramLink;
+            }, 300);
         } catch (err) {
             console.error("Gagal membuat link Telegram:", err);
             setErrorMessage("Gagal menghubungkan Telegram: " + (err.message || "Terjadi kesalahan."));
@@ -452,6 +458,23 @@ export default function ProfilePage() {
                         </p>
                     )}
                 </div>
+
+                {generatedTelegramUrl && !telegramConn?.connected && (
+                    <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 animate-in fade-in">
+                        <a
+                            href={generatedTelegramUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+                        >
+                            <Send className="w-4 h-4" />
+                            Buka Telegram Bot Sekarang 🚀
+                        </a>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            (Jika aplikasi Telegram tidak terbuka otomatis, tekan tombol di atas).
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* List Mahasiswa Kelas Admin (Hanya tampil jika role = ADMIN) */}
