@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "reminder": "node scripts/reminder.js"
+    "reminder": "node scripts/reminder.js",
+    "poll-telegram": "node scripts/telegramPoll.js"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
     "axios": "^1.6.8",
+    "dotenv": "^17.4.2",
     "firebase": "^10.11.0",
     "firebase-admin": "^12.0.0",
     "framer-motion": "^13.2.0",

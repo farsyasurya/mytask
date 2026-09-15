@@ -141,11 +141,11 @@ export default function ReminderModal() {
                         <button
                             onClick={() => {
                                 handleClose();
-                                router.push("/tasks");
+                                router.push("/notifications");
                             }}
                             className="flex-1 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-md shadow-indigo-500/20"
                         >
-                            Lihat Semua Tasks
+                            Lihat Notifikasi
                             <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                     </div>

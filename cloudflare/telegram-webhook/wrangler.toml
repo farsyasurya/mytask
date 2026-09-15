@@ -1,0 +1,10 @@
+name = "mytask-telegram-webhook"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "YOUR_FIREBASE_PROJECT_ID"
+MYTASK_URL = "https://your-mytask-app.vercel.app"
+
+# Telegram Secrets should be added via CLI:
+# npx wrangler secret put TELEGRAM_BOT_TOKEN

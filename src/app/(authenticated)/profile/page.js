@@ -3,13 +3,15 @@
 import { useState, useEffect, useMemo } from "react";
 import {
     User, Mail, Hash, ShieldCheck, Edit3, Save, X, AlertTriangle,
-    CheckCircle2, Users, Search, GraduationCap
+    CheckCircle2, Users, Search, GraduationCap, Send, ExternalLink
 } from "lucide-react";
 import { doc, onSnapshot, updateDoc, collection, query, where } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import Pagination from "@/components/common/Pagination";
+import { createTelegramLinkToken, disconnectTelegram, subscribeTelegramConnection } from "@/services/telegramService";
+
 
 export default function ProfilePage() {
     const { userData: initialUserData, user, refreshUserData, loading: authLoading } = useAuth();
@@ -29,6 +31,55 @@ export default function ProfilePage() {
     const [studentSearch, setStudentSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(5);
+
+    // State untuk Telegram Integration
+    const [telegramConn, setTelegramConn] = useState(null);
+    const [connectingTelegram, setConnectingTelegram] = useState(false);
+    const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
+
+    // Listener realtime status Telegram user
+    useEffect(() => {
+        if (!user?.uid) return;
+        const unsubscribe = subscribeTelegramConnection(user.uid, (conn) => {
+            setTelegramConn(conn);
+        });
+        return () => unsubscribe();
+    }, [user?.uid]);
+
+    const handleConnectTelegram = async () => {
+        if (!user?.uid) return;
+        setConnectingTelegram(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        try {
+            const { telegramLink } = await createTelegramLinkToken(user.uid, profile?.id_user || user.uid);
+            window.open(telegramLink, "_blank");
+            setSuccessMessage("Link Telegram telah dibuat! Silakan buka Telegram dan tekan tombol Start / Mulai.");
+        } catch (err) {
+            console.error("Gagal membuat link Telegram:", err);
+            setErrorMessage("Gagal menghubungkan Telegram: " + (err.message || "Terjadi kesalahan."));
+        } finally {
+            setConnectingTelegram(false);
+        }
+    };
+
+    const handleDisconnectTelegram = async () => {
+        if (!user?.uid) return;
+        if (!window.confirm("Apakah Anda yakin ingin memutuskan koneksi Telegram dari MyTask?")) return;
+        setDisconnectingTelegram(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        try {
+            await disconnectTelegram(user.uid);
+            setSuccessMessage("Akun Telegram berhasil diputuskan.");
+        } catch (err) {
+            console.error("Gagal memutuskan Telegram:", err);
+            setErrorMessage("Gagal memutuskan Telegram: " + (err.message || "Terjadi kesalahan."));
+        } finally {
+            setDisconnectingTelegram(false);
+        }
+    };
+
 
     // Sinkronkan state lokal saat data AuthContext dimuat/berubah
     useEffect(() => {
@@ -339,6 +390,68 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* Section Telegram Integration */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm transition-all space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-lg">
+                            ✈️
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                Telegram Pengingat Tugas
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Dapatkan pengingat tugas otomatis langsung di akun Telegram Anda
+                            </p>
+                        </div>
+                    </div>
+
+                    <div>
+                        {telegramConn?.connected ? (
+                            <button
+                                type="button"
+                                onClick={handleDisconnectTelegram}
+                                disabled={disconnectingTelegram}
+                                className="px-4 py-2 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-300 text-xs font-semibold rounded-xl border border-rose-200 dark:border-rose-800 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {disconnectingTelegram ? "Memproses..." : "Putuskan Telegram"}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleConnectTelegram}
+                                disabled={connectingTelegram}
+                                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                {connectingTelegram ? "Membuat Link..." : "Hubungkan Telegram"}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-600 dark:text-slate-400">Status:</span>
+                        {telegramConn?.connected ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
+                                ✅ Terhubung {telegramConn.telegram_username ? `(@${telegramConn.telegram_username})` : (telegramConn.telegram_chat_id ? `(Chat ID: ${telegramConn.telegram_chat_id})` : "")}
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-bold">
+                                ❌ Belum terhubung
+                            </span>
+                        )}
+                    </div>
+                    {!telegramConn?.connected && (
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            Klik <b>Hubungkan Telegram</b> lalu kirim pesan <code>/start</code> di Telegram untuk menyelesaikan verifikasi.
+                        </p>
+                    )}
+                </div>
             </div>
 
             {/* List Mahasiswa Kelas Admin (Hanya tampil jika role = ADMIN) */}
