@@ -330,7 +330,6 @@ function TasksContent() {
                                     }}
                                     onDelete={handleDelete}
                                     onStatusChange={handleStatusChange}
-                                    onDetail={() => { }}
                                 />
                             </motion.div>
                         ))}

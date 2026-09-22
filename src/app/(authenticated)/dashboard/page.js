@@ -495,7 +495,6 @@ export default function DashboardPage() {
                                 onStatusChange={handleStatusChange}
                                 onDelete={handleDelete}
                                 onEdit={() => router.push("/tasks")}
-                                onDetail={() => router.push("/tasks")}
                             />
                         ))}
                     </div>
@@ -526,7 +525,6 @@ export default function DashboardPage() {
                                     onStatusChange={handleStatusChange}
                                     onDelete={handleDelete}
                                     onEdit={() => router.push("/tasks")}
-                                    onDetail={() => router.push("/tasks")}
                                 />
                             ))}
                         </div>
