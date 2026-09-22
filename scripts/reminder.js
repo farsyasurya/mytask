@@ -23,27 +23,49 @@ const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const MYTASK_URL = process.env.MYTASK_URL || "https://fartaskify.netlify.app";
 
+function formatPrivateKey(key) {
+    if (!key) return undefined;
+    let formatted = key.trim();
+    if ((formatted.startsWith('"') && formatted.endsWith('"')) || (formatted.startsWith("'") && formatted.endsWith("'"))) {
+        formatted = formatted.slice(1, -1).trim();
+    }
+    formatted = formatted.replace(/\\n/g, "\n");
+    if (!formatted.includes("-----BEGIN PRIVATE KEY-----") && !formatted.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+        try {
+            const decoded = Buffer.from(formatted, "base64").toString("utf8");
+            if (decoded.includes("-----BEGIN PRIVATE KEY-----") || decoded.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+                formatted = decoded;
+            }
+        } catch (e) {}
+    }
+    return formatted.replace(/\r\n/g, "\n");
+}
+
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-    : undefined;
+const privateKey = formatPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
 let useAdminSdk = false;
 let dbAdmin = null;
 
 if (FIREBASE_PROJECT_ID && clientEmail && privateKey) {
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: FIREBASE_PROJECT_ID,
-                clientEmail,
-                privateKey
-            })
-        });
+    try {
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: FIREBASE_PROJECT_ID,
+                    clientEmail,
+                    privateKey
+                })
+            });
+        }
+        dbAdmin = admin.firestore();
+        useAdminSdk = true;
+        console.log("🔒 Menggunakan Firebase Admin SDK (Production / CI Mode)");
+    } catch (err) {
+        console.warn("⚠️ Gagal menginisialisasi Firebase Admin SDK:", err.message);
+        console.log("🌐 Beralih ke Firestore REST API (Fallback Mode)");
+        useAdminSdk = false;
     }
-    dbAdmin = admin.firestore();
-    useAdminSdk = true;
-    console.log("🔒 Menggunakan Firebase Admin SDK (Production / CI Mode)");
 } else {
     console.log("🌐 Menggunakan Firestore REST API (Development Mode)");
 }

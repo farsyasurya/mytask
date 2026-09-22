@@ -1,12 +1,28 @@
 import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 
+function formatPrivateKey(key) {
+    if (!key) return undefined;
+    let formatted = key.trim();
+    if ((formatted.startsWith('"') && formatted.endsWith('"')) || (formatted.startsWith("'") && formatted.endsWith("'"))) {
+        formatted = formatted.slice(1, -1).trim();
+    }
+    formatted = formatted.replace(/\\n/g, "\n");
+    if (!formatted.includes("-----BEGIN PRIVATE KEY-----") && !formatted.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+        try {
+            const decoded = Buffer.from(formatted, "base64").toString("utf8");
+            if (decoded.includes("-----BEGIN PRIVATE KEY-----") || decoded.includes("-----BEGIN RSA PRIVATE KEY-----")) {
+                formatted = decoded;
+            }
+        } catch (e) {}
+    }
+    return formatted.replace(/\r\n/g, "\n");
+}
+
 const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-    : undefined;
+const privateKey = formatPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 
 // Initialize Firebase Admin if Service Account credentials are provided
 if (!admin.apps.length && projectId && clientEmail && privateKey) {
