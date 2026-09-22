@@ -41,7 +41,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
 
     // Period Filter State
-    const [period, setPeriod] = useState("all");
+    const [period, setPeriod] = useState("this_week");
     const [customStart, setCustomStart] = useState("");
     const [customEnd, setCustomEnd] = useState("");
 

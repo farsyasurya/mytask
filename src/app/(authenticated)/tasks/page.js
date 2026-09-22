@@ -51,7 +51,7 @@ function TasksContent() {
     const [filterStatus, setFilterStatus] = useState("");
 
     // Period Filter State
-    const [selectedPeriod, setSelectedPeriod] = useState("all");
+    const [selectedPeriod, setSelectedPeriod] = useState("this_week");
     const [customStartDate, setCustomStartDate] = useState("");
     const [customEndDate, setCustomEndDate] = useState("");
 

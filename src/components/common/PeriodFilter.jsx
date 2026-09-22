@@ -3,7 +3,7 @@
 import { Calendar, Filter } from "lucide-react";
 
 export default function PeriodFilter({
-    selectedPeriod = "all",
+    selectedPeriod = "this_week",
     onPeriodChange,
     customStartDate = "",
     customEndDate = "",
