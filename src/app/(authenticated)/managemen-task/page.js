@@ -11,6 +11,7 @@ import {
     deleteAdminTaskGroup
 } from "@/services/taskService";
 import TaskModal from "@/components/task/TaskModal";
+import TaskRecapWAModal from "@/components/task/TaskRecapWAModal";
 import {
     ClipboardList,
     CheckCircle2,
@@ -29,7 +30,10 @@ import {
     FileText,
     Sparkles,
     Edit3,
-    Trash2
+    Trash2,
+    MessageSquare,
+    CheckSquare,
+    Square
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PeriodFilter, { filterItemsByPeriod } from "@/components/common/PeriodFilter";
@@ -63,6 +67,26 @@ export default function ManagemenTaskPage() {
     // State untuk Modal Edit Tugas Admin
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [taskToEdit, setTaskToEdit] = useState(null);
+
+    // State untuk Modal Rekap WhatsApp
+    const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
+    const [selectedTaskKeys, setSelectedTaskKeys] = useState([]);
+
+    const handleToggleSelectTask = (key) => {
+        setSelectedTaskKeys((prev) =>
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+        );
+    };
+
+    const handleToggleSelectAllVisible = () => {
+        const visibleKeys = paginatedTasks.map((t) => t.groupKey);
+        const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every((k) => selectedTaskKeys.includes(k));
+        if (allVisibleSelected) {
+            setSelectedTaskKeys((prev) => prev.filter((k) => !visibleKeys.includes(k)));
+        } else {
+            setSelectedTaskKeys((prev) => Array.from(new Set([...prev, ...visibleKeys])));
+        }
+    };
 
     const handleEditTaskGroup = (taskGroup) => {
         setTaskToEdit({
@@ -254,7 +278,21 @@ export default function ManagemenTaskPage() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={() => setIsRecapModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-emerald-600/20"
+                        title="Pilih dan kirim rekap tugas ke WhatsApp Group"
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Pilih Rekap WA</span>
+                        {selectedTaskKeys.length > 0 && (
+                            <span className="px-1.5 py-0.5 bg-white text-emerald-700 rounded-full text-[10px] font-bold">
+                                {selectedTaskKeys.length}
+                            </span>
+                        )}
+                    </button>
+
                     <button
                         onClick={() => router.push("/task-admin")}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-indigo-600/20"
@@ -386,6 +424,18 @@ export default function ManagemenTaskPage() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                    <th className="py-3.5 px-3 w-10 text-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={
+                                                paginatedTasks.length > 0 &&
+                                                paginatedTasks.every((t) => selectedTaskKeys.includes(t.groupKey))
+                                            }
+                                            onChange={handleToggleSelectAllVisible}
+                                            className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                            title="Pilih Semua di Halaman Ini"
+                                        />
+                                    </th>
                                     <th className="py-3.5 px-4">Mata Kuliah & Judul Tugas</th>
                                     <th className="py-3.5 px-4">Pertemuan</th>
                                     <th className="py-3.5 px-4">Deadline</th>
@@ -396,8 +446,25 @@ export default function ManagemenTaskPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
                                 {paginatedTasks.map((taskGroup) => {
+                                    const isSelected = selectedTaskKeys.includes(taskGroup.groupKey);
                                     return (
-                                        <tr key={taskGroup.groupKey} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                                        <tr
+                                            key={taskGroup.groupKey}
+                                            className={`transition-colors ${isSelected
+                                                    ? "bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50/70"
+                                                    : "hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
+                                                }`}
+                                        >
+                                            {/* Checkbox Selection */}
+                                            <td className="py-3.5 px-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => handleToggleSelectTask(taskGroup.groupKey)}
+                                                    className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                />
+                                            </td>
+
                                             {/* Mata Kuliah & Judul Tugas */}
                                             <td className="py-3.5 px-4">
                                                 <div className="font-bold text-slate-900 dark:text-slate-100">
@@ -504,21 +571,32 @@ export default function ManagemenTaskPage() {
                         {paginatedTasks.map((taskGroup) => (
                             <div
                                 key={taskGroup.groupKey}
-                                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-3"
+                                className={`p-4 rounded-2xl border transition-all space-y-3 ${selectedTaskKeys.includes(taskGroup.groupKey)
+                                        ? "border-emerald-400 bg-emerald-50/40 dark:border-emerald-500/50 dark:bg-emerald-950/20"
+                                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"
+                                    }`}
                             >
                                 <div className="flex justify-between items-start gap-2">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300">
-                                                {taskGroup.matkul}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-mono">
-                                                Pertemuan {taskGroup.pertemuan}
-                                            </span>
+                                    <div className="flex items-start gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTaskKeys.includes(taskGroup.groupKey)}
+                                            onChange={() => handleToggleSelectTask(taskGroup.groupKey)}
+                                            className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300">
+                                                    {taskGroup.matkul}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                    Pertemuan {taskGroup.pertemuan}
+                                                </span>
+                                            </div>
+                                            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                                {taskGroup.judul}
+                                            </h4>
                                         </div>
-                                        <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                                            {taskGroup.judul}
-                                        </h4>
                                     </div>
 
                                     <div className="flex items-center gap-1 shrink-0">
@@ -746,6 +824,52 @@ export default function ManagemenTaskPage() {
                 onSave={handleSaveEditedTaskGroup}
                 taskToEdit={taskToEdit}
             />
+
+            {/* Modal Rekap Tugas WhatsApp */}
+            <TaskRecapWAModal
+                isOpen={isRecapModalOpen}
+                onClose={() => setIsRecapModalOpen(false)}
+                tasks={filteredTasks}
+                initialSelectedKeys={selectedTaskKeys}
+                kelas={kelas}
+            />
+
+            {/* Sticky Floating Bar saat ada tugas yang dicentang */}
+            <AnimatePresence>
+                {selectedTaskKeys.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 50 }}
+                        className="fixed bottom-6 inset-x-4 max-w-md mx-auto z-40 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl p-3.5 sm:p-4 shadow-2xl flex items-center justify-between gap-3 border border-slate-700 dark:border-slate-200"
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                                {selectedTaskKeys.length}
+                            </span>
+                            <span className="text-xs sm:text-sm font-semibold">
+                                Tugas Dipilih
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setSelectedTaskKeys([])}
+                                className="px-2.5 py-1.5 text-xs text-slate-300 dark:text-slate-600 hover:text-white dark:hover:text-black transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={() => setIsRecapModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/30"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>Kirim Rekap WA</span>
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
